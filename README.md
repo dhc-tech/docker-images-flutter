@@ -1,5 +1,7 @@
 # docker-images-flutter
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dhc-tech/docker-images-flutter/badge)](https://scorecard.dev/viewer/?uri=github.com/dhc-tech/docker-images-flutter)
+
 A self-owned Flutter CI Docker image — built from scratch on plain
 Ubuntu, no third-party Android/Flutter base image. Installs the Android
 SDK command-line tools, Google Chrome, and the Linux desktop toolchain
@@ -185,4 +187,7 @@ build:
   bot PRs.
 - `.github/dependabot.yml` — keeps Actions versions and the base image
   current.
-- `.github/workflows/` — the workflows described above.
+- `.github/workflows/` — the workflows described above, plus
+  `scorecard.yml`: runs [OpenSSF Scorecard](https://github.com/ossf/scorecard)
+  against this repo weekly and on every push to `main`, publishing the
+  result to the badge above and to GitHub's Code Scanning dashboard.
