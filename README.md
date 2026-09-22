@@ -70,8 +70,8 @@ auto-merged, even if it happens to touch the same files:
   stable release and opens a PR (labeled `automated-flutter-bump`)
   bumping `FLUTTER_VERSION`.
 - **Dependabot** (`.github/dependabot.yml`) — opens its own PRs bumping
-  GitHub Actions versions used in the workflows, and the `ubuntu:24.04`
-  base image in the Dockerfile.
+  GitHub Actions versions used in the workflows, and the Dockerfile's
+  base Ubuntu image.
 
 For either:
 
@@ -109,8 +109,6 @@ Already configured on this repo — noted here in case it's ever recreated:
   (from `pr-check.yml`), strict (branch must be up to date) — this is
   also what makes `git push origin main` fail for anything but a proper
   PR merge.
-- A label named `automated-flutter-bump` must exist on the repo (`gh
-  label create`) before `check-flutter-version.yml` can apply it.
 
 ## Usage
 

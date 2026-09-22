@@ -60,6 +60,14 @@ jobs:
           NEW_VERSION: ${{ steps.latest.outputs.version }}
           OLD_VERSION: ${{ steps.compare.outputs.current }}
         run: |
+          # Idempotent — a no-op once the label already exists. Removes the
+          # manual "create this label by hand" one-time setup step for
+          # anyone recreating this repo's automation from scratch.
+          gh label create "automated-flutter-bump" \
+            --color "1D76DB" \
+            --description "Opened automatically by check-flutter-version.yml" \
+            --force
+
           branch="flutter-bump/${NEW_VERSION}"
           # Idempotent against a genuinely open bump PR — NOT against the
           # branch merely existing. A merged/closed PR's branch (normally
