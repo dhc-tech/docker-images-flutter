@@ -15,6 +15,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Labels live under the Issues REST endpoint (/repos/.../labels) —
+  # `gh label create` below needs issues:write, not pull-requests:write.
+  issues: write
 
 jobs:
   check:
