@@ -47,7 +47,7 @@ Nothing in this repo hardcodes "the current Flutter version" as a
 judgment call — every tag traces back to flutter/flutter's own repository
 state:
 
-`check-flutter-version.yml` runs every 5 minutes. It asks the GitHub API
+`check-flutter-version.yml` runs every 15 minutes. It asks the GitHub API
 which commit `flutter/flutter`'s `stable` branch currently points at,
 then which tag (if any) points at that exact same commit — that tag name
 *is* the real, official version number Flutter itself assigned to that
@@ -122,7 +122,7 @@ above, spelled out as copy-pasteable `image:` lines:
 image: ghcr.io/dhc-tech/flutter:stable
 ```
 Always builds against whatever Flutter itself currently calls its stable
-release. Moves forward automatically (~quarterly, within ~5 min of it
+release. Moves forward automatically (~quarterly, within ~15 min of it
 actually changing) — you never touch this line again.
 
 **Reproducible builds — freeze one exact Flutter version forever:**

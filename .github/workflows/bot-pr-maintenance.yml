@@ -33,9 +33,12 @@ name: Bot PR maintenance
 # e.g. the Flutter version bump bot's own PRs).
 on:
   schedule:
-    # Every 5 minutes — GitHub Actions' own documented minimum schedule
-    # granularity.
-    - cron: "*/5 * * * *"
+    # Every 15 minutes — this only ever acts on bot-authored PRs, which
+    # are rare (a Flutter release or a Dependabot bump), so polling
+    # GitHub Actions' minimum 5-minute granularity here just burns 3x the
+    # Actions minutes for no real gain in how fast a bot PR gets
+    # approved/advanced.
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 permissions:

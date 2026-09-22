@@ -7,7 +7,7 @@ name: Build and push CI image
 # published — no `beta`/`main` channel tags.
 #
 # No polling/schedule here on purpose: check-flutter-version.yml already
-# polls flutter/flutter every 5 minutes and only merges a FLUTTER_VERSION
+# polls flutter/flutter every 15 minutes and only merges a FLUTTER_VERSION
 # bump when a genuinely new stable release is tagged. That merge is what
 # triggers this workflow (via the FLUTTER_VERSION path filter below) — so
 # a rebuild only ever happens for a real new release or a manual/
@@ -51,3 +51,9 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/flutter:${{ steps.pinned.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/flutter:pinned
             ghcr.io/${{ github.repository_owner }}/flutter:stable
+          # Shares the same GitHub Actions cache pr-check.yml already
+          # warms on every PR — the base OS/Android/Chrome layers (slow,
+          # network-heavy) are reused here instead of rebuilt from
+          # scratch on every version bump.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

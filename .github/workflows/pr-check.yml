@@ -49,3 +49,10 @@ jobs:
           push: false
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
+          # GitHub Actions cache for Docker layers — the base OS/Android/
+          # Chrome layers (the slow, network-heavy part) rarely change
+          # even when FLUTTER_VERSION does, so most builds after the
+          # first reuse them from cache instead of re-downloading and
+          # re-installing everything from scratch every time.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
