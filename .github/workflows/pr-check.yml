@@ -62,9 +62,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Not (yet) a required status check — add it in Settings → Branches if
-  # you want PRs blocked on the split images building too, the same way
-  # build-check already blocks on the combo image.
+  # A required status check on main, same as build-check (see README's
+  # "One-time repo setup") — configured as 3 separate required contexts,
+  # one per matrix entry: "build-check-platforms (android/web/linux)".
   build-check-platforms:
     strategy:
       fail-fast: false
@@ -91,8 +91,20 @@ jobs:
         name: Read pinned Flutter version
         id: pinned
         run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+
+      # driver: docker, not the default docker-container — see the
+      # matching comment in build-and-push.yml's build-platforms job.
+      # The docker-container driver's isolated BuildKit container can't
+      # see an image `--load`'d into the host Docker Engine, so a later
+      # `FROM flutter-base:build` fails trying to pull it from Docker
+      # Hub instead. driver: docker builds directly against the host
+      # engine, so the image is visible immediately — confirmed against
+      # a real failed run even after trying the documented
+      # `docker-image://` build-context workaround.
       - if: steps.changed.outputs.affected == 'true'
         uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - if: steps.changed.outputs.affected == 'true'
         name: Build shared base layer
@@ -100,13 +112,10 @@ jobs:
         with:
           context: .
           file: base.Dockerfile
-          push: false
           load: true
           tags: flutter-base:build
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
-          cache-from: type=gha,scope=flutter-base
-          cache-to: type=gha,mode=max,scope=flutter-base
 
       - if: steps.changed.outputs.affected == 'true'
         uses: docker/build-push-action@v7
@@ -116,11 +125,3 @@ jobs:
           push: false
           build-args: |
             BASE_IMAGE=flutter-base:build
-          # See the matching comment in build-and-push.yml — redirects
-          # `FROM flutter-base:build` to the locally-loaded image instead
-          # of a registry pull, which fails outright since that repo
-          # doesn't exist on Docker Hub.
-          build-contexts: |
-            flutter-base:build=docker-image://flutter-base:build
-          cache-from: type=gha,scope=flutter-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=flutter-${{ matrix.platform }}
