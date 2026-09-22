@@ -87,23 +87,35 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # driver: docker (not the default docker-container) on purpose —
+      # base.Dockerfile is built locally here and then referenced by
+      # android/web/linux.Dockerfile's `FROM ${BASE_IMAGE}`. The
+      # docker-container driver runs BuildKit in its own isolated
+      # container with its own separate image store, so a locally
+      # --load'd image is invisible to a later buildx invocation
+      # against it — confirmed by a real failed run ("pull access
+      # denied ... docker.io/library/flutter-base") even after trying
+      # the documented `docker-image://` build-context workaround. The
+      # `docker` driver instead builds directly against the host Docker
+      # Engine, so an image built (or loaded) here is immediately
+      # visible to the very next `FROM flutter-base:build` — at the
+      # cost of no `type=gha` remote cache export, which that driver
+      # doesn't support; ordinary Docker layer caching still applies
+      # within this same job's steps.
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - name: Build shared base layer
         uses: docker/build-push-action@v7
         with:
           context: .
           file: base.Dockerfile
-          push: false
           load: true
           tags: flutter-base:build
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
-          # Shared cache scope across all 3 matrix jobs — the base
-          # layer's content is identical for android/web/linux, so a
-          # cache warmed by one platform's job speeds up the others too.
-          cache-from: type=gha,scope=flutter-base
-          cache-to: type=gha,mode=max,scope=flutter-base
 
       - uses: docker/build-push-action@v7
         with:
@@ -112,20 +124,9 @@ jobs:
           push: true
           build-args: |
             BASE_IMAGE=flutter-base:build
-          # Without this, buildx's docker-container driver resolves
-          # `FROM flutter-base:build` as a *registry* pull (docker.io/
-          # library/flutter-base) instead of the image just loaded
-          # locally above — fails with "pull access denied" since that
-          # repo doesn't exist on Docker Hub. This redirects that exact
-          # FROM reference to the local image loaded by `load: true`
-          # above instead of a registry lookup.
-          build-contexts: |
-            flutter-base:build=docker-image://flutter-base:build
           labels: |
             org.opencontainers.image.version=${{ steps.pinned.outputs.version }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:${{ steps.pinned.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:pinned
             ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:stable
-          cache-from: type=gha,scope=flutter-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=flutter-${{ matrix.platform }}

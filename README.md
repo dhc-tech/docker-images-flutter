@@ -19,6 +19,14 @@ image, or three separate per-platform images (see
 platform requirement, not something this image chooses to omit, and no
 Docker/Linux container anywhere can do it.
 
+**Jump to:** [Which image?](#which-image-should-i-use) ·
+[Tags](#tags) ·
+[How versions are resolved](#how-versions-are-resolved) ·
+[Release flow](#fully-automated-release-flow) ·
+[Usage](#usage) ·
+[CI examples](#ci-usage-examples) ·
+[Repo layout](#repo-layout)
+
 ## Which image should I use
 
 Two families, both public on `ghcr.io/dhc-tech` (pull with no registry
@@ -100,10 +108,12 @@ auto-merged, even if it happens to touch the same files:
 
 For either:
 
-1. `pr-check.yml` builds the Dockerfile against the change (no push) to
-   confirm it actually builds before anything merges — for a
-   workflow-only Dependabot PR that can't affect the image, it skips the
-   actual build and passes immediately instead.
+1. `pr-check.yml` builds the affected Dockerfile(s) against the change
+   (no push) to confirm they actually build before anything merges —
+   `build-check` for the combo `flutter` image, `build-check-platforms`
+   for the 3 split images — for a workflow-only Dependabot PR that can't
+   affect either, both skip the actual build and pass immediately
+   instead.
 2. `auto-merge.yml` — checks the PR's live author/label (not the
    `opened` event's payload, which isn't reliably populated with a label
    set at PR-creation time) — enables GitHub's native auto-merge, which
@@ -131,10 +141,10 @@ Already configured on this repo — noted here in case it's ever recreated:
   not permitted to create or approve pull requests."*
 - **Settings → General → Pull Requests → "Allow auto-merge"** — without
   this, `gh pr merge --auto` has nothing to enable.
-- **Branch protection on `main`**: required status check `build-check`
-  (from `pr-check.yml`), strict (branch must be up to date) — this is
-  also what makes `git push origin main` fail for anything but a proper
-  PR merge.
+- **Branch protection on `main`**: required status checks `build-check`
+  and `build-check-platforms` (android/web/linux) — all from
+  `pr-check.yml` — strict (branch must be up to date). This is also what
+  makes `git push origin main` fail for anything but a proper PR merge.
 
 ## Usage
 
