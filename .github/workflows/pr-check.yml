@@ -30,7 +30,7 @@ jobs:
       # to the `else` branch and skipped the actual Docker build, so
       # this required check had been passing on every PR without ever
       # building anything.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
@@ -89,7 +89,7 @@ jobs:
     steps:
       # fetch-depth: 0 — see the matching comment on build-check above;
       # same shallow-clone bug, same silent-skip failure mode.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
