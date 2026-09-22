@@ -23,7 +23,16 @@ jobs:
   build-check:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 (full history) — with the default shallow (depth
+      # 1) checkout, `git diff base head` below fails outright ("fatal:
+      # bad object <base-sha>") because the base commit was never
+      # fetched. Confirmed on a real PR: every run silently fell through
+      # to the `else` branch and skipped the actual Docker build, so
+      # this required check had been passing on every PR without ever
+      # building anything.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       # A workflow-only change (e.g. Dependabot bumping actions/checkout's
       # version) can't affect the built image — skip the actual (slow)
@@ -32,9 +41,15 @@ jobs:
       - name: Check whether the image itself is affected
         id: changed
         run: |
+          set -e
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
-          if git diff --name-only "$base" "$head" | grep -qE '^(Dockerfile|FLUTTER_VERSION)$'; then
+          # set -e turns a git failure (e.g. this diff itself erroring)
+          # into a hard job failure instead of silently falling through
+          # to "not affected" — exactly the bug fetch-depth: 0 above
+          # fixes, but this is the backstop if it ever regresses.
+          changed_files="$(git diff --name-only "$base" "$head")"
+          if echo "$changed_files" | grep -qE '^(Dockerfile|FLUTTER_VERSION)$'; then
             echo "affected=true" >> "$GITHUB_OUTPUT"
           else
             echo "affected=false" >> "$GITHUB_OUTPUT"
@@ -72,14 +87,20 @@ jobs:
         platform: [android, web, linux]
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 — see the matching comment on build-check above;
+      # same shallow-clone bug, same silent-skip failure mode.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Check whether this platform's image is affected
         id: changed
         run: |
+          set -e
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
-          if git diff --name-only "$base" "$head" \
+          changed_files="$(git diff --name-only "$base" "$head")"
+          if echo "$changed_files" \
               | grep -qE "^(base\.Dockerfile|${{ matrix.platform }}\.Dockerfile|FLUTTER_VERSION)$"; then
             echo "affected=true" >> "$GITHUB_OUTPUT"
           else
