@@ -42,7 +42,7 @@ jobs:
   build-combo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Read pinned Flutter version
         id: pinned
         run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
@@ -78,7 +78,7 @@ jobs:
         platform: [android, web, linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Read pinned Flutter version
         id: pinned
         run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
