@@ -22,27 +22,22 @@ registry credentials):
 
 | Tag | What it is | Pick this if you want... | Rebuilds |
 |---|---|---|---|
-| `stable` | Flutter's official **stable** channel — the tip of flutter/flutter's `stable` branch. Recommended by Flutter itself for new users and production releases; updated from `beta` roughly every 3 months, with occasional hot fixes for high-severity issues | The version most people should build against day to day | Within ~5 min of a new commit landing on that branch (GitHub Actions' own minimum schedule granularity) |
-| `beta` | Flutter's **beta** channel — the tip of flutter/flutter's `beta` branch. Per Flutter's own docs, "essentially the same as the stable channel but updated monthly instead of quarterly" — when `stable` updates, it updates *to* the beta channel's current state, so this is genuinely a preview of what `stable` becomes next, not a separate experimental line | Slightly newer fixes/features than `stable`, heavily tested but not yet promoted | Once daily |
-| `main` | Flutter's **main** channel (used to be called `master`) — the tip of flutter/flutter's `main` branch, where Flutter's own contributors work. Flutter's own docs explicitly recommend against using it: "not as thoroughly tested... more likely to contain serious regressions" | Testing against unreleased Flutter source, ahead of `beta` | Once daily |
+| `stable` | Flutter's official **stable** channel — the tip of flutter/flutter's `stable` branch. Recommended by Flutter itself for new users and production releases | The version most people should build against day to day | Within ~5 min of a new commit landing on that branch (GitHub Actions' own minimum schedule granularity) |
 | `<version>` (e.g. `3.47.2`) / `pinned` | The exact version number of the current stable release, immutable — never silently changes under you | Reproducible builds: the same tag always means the same Flutter build, unlike `stable` which moves forward over time | Automatically, the moment flutter/flutter's `stable` branch is tagged with a new version — see below |
 
 In short: `stable` tracks whatever Flutter currently calls its stable
 release (moves over time, ~quarterly); `<version>`/`pinned` freezes that
-same release at one exact number (never moves); `beta` is what `stable`
-will become next (~monthly); `main` is Flutter's own bleeding-edge
-contributor branch, explicitly not recommended by Flutter for general use.
-See [docs.flutter.dev/release/upgrade](https://docs.flutter.dev/release/upgrade)
-for Flutter's own explanation of these channels.
+same release at one exact number (never moves). Only these two are
+published here — Flutter's `beta` and `main` channels are intentionally
+not built, to keep this image's surface to what's actually recommended
+for day-to-day and reproducible builds. See
+[docs.flutter.dev/release/upgrade](https://docs.flutter.dev/release/upgrade)
+for Flutter's own explanation of its channels.
 
 There is no `latest` tag — `stable` already means exactly that (Flutter's
 own current stable release), so a separate `latest` alias would only
 duplicate `stable` under a second name and invite confusion about which
 one to use.
-
-`dev` is intentionally not built — Flutter deprecated it, it is not one of
-the 3 real channels (stable/beta/main) — see
-[docs.flutter.dev/release/upgrade](https://docs.flutter.dev/release/upgrade).
 
 ## How versions are resolved
 
@@ -60,8 +55,6 @@ state, checked automatically and often:
   variables need no push), and only rebuilds — and only updates that
   recorded SHA — if the branch has genuinely moved. An unchanged branch
   is a fast no-op, not a wasted rebuild.
-- **`beta`/`main` tags** — `build-daily-channels` job, same
-  changed-SHA check, but on a once-daily cron instead of every 5 minutes.
 - **`<version>`/`pinned` tag** — `check-flutter-version.yml` runs every
   5 minutes. It asks the GitHub API which commit `flutter/flutter`'s
   `stable` branch currently points at, then which tag (if any) points at
@@ -125,7 +118,7 @@ Already configured on this repo — noted here in case it's ever recreated:
 
 ## Usage
 
-Pick a tag based on what you actually want — same 4 options as the table
+Pick a tag based on what you actually want — same 2 options as the table
 above, spelled out as copy-pasteable `image:` lines:
 
 **Most people, most of the time — track official Flutter stable:**
@@ -146,25 +139,10 @@ yourself when you deliberately want to move to a newer Flutter version.
 `pinned` (no version number) always points at the same commit as the
 current `<version>` tag, if you'd rather not track the number at all.
 
-**Want to try Flutter's upcoming release before it reaches stable:**
-```yaml
-image: ghcr.io/dhc-tech/flutter:beta
-```
-This is what `stable` becomes next (~monthly cadence) — heavily tested by
-the Flutter team already, just not yet promoted. Rebuilds daily.
-
-**Testing against Flutter's own bleeding-edge, unreleased source:**
-```yaml
-image: ghcr.io/dhc-tech/flutter:main
-```
-Flutter's own contributor branch. Flutter's docs explicitly say not to
-use this for anything but testing against upstream changes as they land
-— expect regressions. Rebuilds daily.
-
 ### Checking exactly what Flutter version a tag contains
 
-Every image — including the mutable `stable`/`beta`/`main` tags, which
-don't carry a version in their own name — carries an
+Every image — including the mutable `stable` tag, which doesn't carry a
+version in its own name — carries an
 `org.opencontainers.image.version` label recording the exact commit it
 was built from, so you never have to guess:
 
@@ -210,8 +188,8 @@ build:
   git ref (a version tag or a channel branch name) to install.
 - `FLUTTER_VERSION` — single source of truth for the `pinned` tag's
   version; only ever changed by `check-flutter-version.yml`'s bot PRs.
-- `LAST_BUILT_SHA_<CHANNEL>` repository variables (Settings → Secrets and
-  variables → Actions → Variables) — last-built commit SHA per channel,
+- `LAST_BUILT_SHA_STABLE` repository variable (Settings → Secrets and
+  variables → Actions → Variables) — last-built commit SHA for `stable`,
   used to skip no-op rebuilds; only ever changed by `build-and-push.yml`
   itself.
 - `.github/dependabot.yml` — keeps Actions versions and the base image
