@@ -112,6 +112,15 @@ jobs:
           push: true
           build-args: |
             BASE_IMAGE=flutter-base:build
+          # Without this, buildx's docker-container driver resolves
+          # `FROM flutter-base:build` as a *registry* pull (docker.io/
+          # library/flutter-base) instead of the image just loaded
+          # locally above — fails with "pull access denied" since that
+          # repo doesn't exist on Docker Hub. This redirects that exact
+          # FROM reference to the local image loaded by `load: true`
+          # above instead of a registry lookup.
+          build-contexts: |
+            flutter-base:build=docker-image://flutter-base:build
           labels: |
             org.opencontainers.image.version=${{ steps.pinned.outputs.version }}
           tags: |

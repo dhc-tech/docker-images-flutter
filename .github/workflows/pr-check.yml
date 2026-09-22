@@ -116,5 +116,11 @@ jobs:
           push: false
           build-args: |
             BASE_IMAGE=flutter-base:build
+          # See the matching comment in build-and-push.yml — redirects
+          # `FROM flutter-base:build` to the locally-loaded image instead
+          # of a registry pull, which fails outright since that repo
+          # doesn't exist on Docker Hub.
+          build-contexts: |
+            flutter-base:build=docker-image://flutter-base:build
           cache-from: type=gha,scope=flutter-${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=flutter-${{ matrix.platform }}
