@@ -29,7 +29,13 @@ RUN apt-get update \
         # Linux desktop: https://docs.flutter.dev/platform-integration/linux/building
         clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
     && locale-gen en_US.UTF-8 \
-    && rm -rf /var/lib/apt/lists/*
+    # apt-get install leaves downloaded .deb packages cached under
+    # /var/cache/apt/archives — dead weight in the final image (openjdk
+    # + clang + cmake alone add up) once install is done. Every byte
+    # here is a byte every consumer of this image re-downloads on every
+    # pull, in every CI system.
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Web: real Chrome for `flutter test --platform chrome` /
 # `flutter drive -d web-server` — https://docs.flutter.dev/testing/integration-tests.
@@ -48,7 +54,8 @@ RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
         > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
     # Build-time smoke test — proves the binary genuinely runs (not just
     # that `apt install` exited 0), so a regression like the snap-wrapper
     # issue above fails the Docker build immediately instead of surfacing
@@ -85,7 +92,8 @@ RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
 # This image works unmodified for any project's SDK level, current or
 # future, without ever needing a version bump here.
 RUN yes | sdkmanager --licenses \
-    && sdkmanager "platform-tools"
+    && sdkmanager "platform-tools" \
+    && rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache
 
 # cmake for native/NDK builds — not covered by Gradle's own auto-download,
 # and Flutter has no official pinned constant for it (unlike compileSdk/
@@ -139,7 +147,12 @@ RUN GRADLE_UTILS="${FLUTTER_HOME}/packages/flutter_tools/lib/src/android/gradle_
     && echo "Installing Flutter's official compileSdk: android-${COMPILE_SDK}, NDK: ${NDK_VERSION}" \
     && sdkmanager "platforms;android-${COMPILE_SDK}" "ndk;${NDK_VERSION}" \
     && echo "${COMPILE_SDK}" > /opt/flutter-compilesdk-version.txt \
-    && echo "${NDK_VERSION}" > /opt/flutter-ndk-version.txt
+    && echo "${NDK_VERSION}" > /opt/flutter-ndk-version.txt \
+    # The NDK download alone is several hundred MB to 1GB+ — same
+    # leftover-temp-file issue as the cmake sdkmanager call above, just
+    # never cleaned up here. Every consumer pulling this image pays for
+    # that dead weight on every pull otherwise.
+    && rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache
 
 # Bake in the exact ref this image was built for, so a build using it can
 # assert against it the same way a consuming pipeline's own version check
