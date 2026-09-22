@@ -1,0 +1,135 @@
+name: Bot PR maintenance
+
+# Consolidates two recurring sweeps that both used to duplicate the same
+# "is this branch/PR one of this repo's trusted bots?" check in separate
+# files (approve-bot-runs.yml, merge-queue-fallback.yml): resolving the
+# trusted set now happens once, in `trusted-prs`, and is reused by both
+# downstream jobs.
+#
+# - approve-runs: GitHub gates a workflow run behind manual "Approve and
+#   run" the first time it's associated with a given actor/branch
+#   combination — confirmed repeatedly against real bot-opened PRs in this
+#   repo (not a fork-PR setting; happens on same-repo PRs too). There is no
+#   repo setting that permanently disables this, so this sweeps for it and
+#   clears it automatically, restricted to trusted branches only.
+# - advance-prs: GitHub's native merge queue (the proper fix for "several
+#   auto-merge PRs land, each one falls behind main as the previous one
+#   merges") requires an organization-owned repo on GitHub Team/Enterprise
+#   — rejected here with a generic validation error when actually
+#   attempted via the rulesets API. This is the equivalent for a personal
+#   repo: periodically (1) enable auto-merge if it isn't already, since
+#   auto-merge.yml's pull_request_target trigger has been observed to
+#   simply not fire at all for some bot-opened PRs (confirmed on a real
+#   PR — zero runs ever appeared for it), and (2) update the branch if it's
+#   fallen behind main, so it doesn't sit stuck waiting for a manual
+#   "Update branch" click.
+#
+# Needs GH_PAT_WORKFLOW (repo secret: a personal access token with the
+# `workflow` OAuth scope) for advance-prs — Dependabot's github-actions PRs
+# modify files under .github/workflows/ themselves, and the default
+# GITHUB_TOKEN can never update a PR branch that touches workflow files,
+# full stop; no `permissions:` entry changes this. Falls back to
+# GITHUB_TOKEN if the secret isn't set (works for non-workflow-file PRs,
+# e.g. the Flutter version bump bot's own PRs).
+on:
+  schedule:
+    # Every 5 minutes — GitHub Actions' own documented minimum schedule
+    # granularity.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  trusted-prs:
+    runs-on: ubuntu-latest
+    outputs:
+      prs: ${{ steps.resolve.outputs.prs }}
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: resolve
+        run: |
+          set -e
+          prs="$(gh pr list --repo ${{ github.repository }} --state open \
+            --json number,author,labels,mergeStateStatus,url,autoMergeRequest,headRefName)"
+          trusted="$(echo "$prs" | jq -c '[.[] | select(
+            (.author.login == "dependabot[bot]") or
+            (.author.login == "app/dependabot") or
+            ([.labels[].name] | contains(["automated-flutter-bump"]))
+          )]')"
+          echo "prs=$trusted" >> "$GITHUB_OUTPUT"
+          echo "Trusted open PRs: $(echo "$trusted" | jq -r '[.[].number] | join(", ")')"
+
+  approve-runs:
+    needs: trusted-prs
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRUSTED_PRS: ${{ needs.trusted-prs.outputs.prs }}
+        run: |
+          set -e
+          trusted_branches="$(echo "$TRUSTED_PRS" | jq -r '.[].headRefName')"
+          runs="$(gh api "repos/${{ github.repository }}/actions/runs?status=action_required" --jq '.workflow_runs')"
+          echo "$runs" | jq -c '.[]' | while read -r run; do
+            run_id="$(echo "$run" | jq -r '.id')"
+            head_branch="$(echo "$run" | jq -r '.head_branch')"
+
+            # flutter-bump/* is trusted by naming convention alone (the
+            # check-flutter-version.yml bot's own branches): its PR may not
+            # be queryable yet at the exact moment the run needs approval.
+            case "$head_branch" in
+              flutter-bump/*) trusted=true ;;
+              *) trusted="$(echo "$trusted_branches" | grep -qxF "$head_branch" && echo true || echo false)" ;;
+            esac
+
+            if [ "$trusted" != "true" ]; then
+              echo "Run $run_id on '$head_branch' is not a trusted bot branch — leaving it for manual review."
+              continue
+            fi
+
+            echo "Approving run $run_id on trusted branch '$head_branch'."
+            gh api -X POST "repos/${{ github.repository }}/actions/runs/$run_id/approve" || \
+              echo "::warning::Could not approve run $run_id — may need a human to approve it manually this once."
+          done
+
+  advance-prs:
+    needs: trusted-prs
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
+          TRUSTED_PRS: ${{ needs.trusted-prs.outputs.prs }}
+        run: |
+          set -e
+          echo "$TRUSTED_PRS" | jq -c '.[]' | while read -r pr; do
+            number="$(echo "$pr" | jq -r '.number')"
+            author="$(echo "$pr" | jq -r '.author.login')"
+            url="$(echo "$pr" | jq -r '.url')"
+            status="$(echo "$pr" | jq -r '.mergeStateStatus')"
+            has_auto_merge="$(echo "$pr" | jq -r '.autoMergeRequest != null')"
+
+            if [ "$has_auto_merge" != "true" ]; then
+              echo "PR #$number ($author) has no auto-merge enabled yet — enabling."
+              if ! gh pr merge --auto --squash "$url"; then
+                echo "::error::Failed to enable auto-merge for PR #$number."
+                echo "$number" >> /tmp/failed_prs
+              fi
+            fi
+
+            if [ "$status" = "BEHIND" ]; then
+              echo "PR #$number ($author) is behind main — updating branch."
+              if ! gh api -X PUT "repos/${{ github.repository }}/pulls/$number/update-branch"; then
+                echo "::error::Failed to update branch for PR #$number — it stays open/unmerged, not retried until the next scheduled sweep."
+                echo "$number" >> /tmp/failed_prs
+              fi
+            fi
+          done
+          if [ -s /tmp/failed_prs ]; then
+            echo "::error::advance-prs failed for: $(paste -sd, /tmp/failed_prs)"
+            exit 1
+          fi

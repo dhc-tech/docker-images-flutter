@@ -178,6 +178,32 @@ or without pulling the image, via the GHCR API:
 docker manifest inspect ghcr.io/dhc-tech/flutter:stable
 ```
 
+## CI usage examples
+
+Copy-pasteable snippets for running this image as the build container in a
+few common CI systems — swap the tag for whichever one you picked in
+[Usage](#usage) above.
+
+**GitHub Actions:**
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/dhc-tech/flutter:stable
+    steps:
+      - uses: actions/checkout@v7
+      - run: flutter build apk
+```
+
+**GitLab CI:**
+```yaml
+build:
+  image: ghcr.io/dhc-tech/flutter:stable
+  script:
+    - flutter build apk
+```
+
 ## Repo layout
 
 - `Dockerfile` — the image itself. `FLUTTER_REF` build arg selects the
@@ -190,4 +216,4 @@ docker manifest inspect ghcr.io/dhc-tech/flutter:stable
   itself.
 - `.github/dependabot.yml` — keeps Actions versions and the base image
   current.
-- `.github/workflows/` — the four workflows described above.
+- `.github/workflows/` — the workflows described above.
