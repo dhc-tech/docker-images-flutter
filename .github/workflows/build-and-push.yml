@@ -5,6 +5,14 @@ name: Build and push CI image
 #
 # Only `stable` (mutable) and `pinned`/`<version>` (immutable) are
 # published — no `beta`/`main` channel tags.
+#
+# No polling/schedule here on purpose: check-flutter-version.yml already
+# polls flutter/flutter every 5 minutes and only merges a FLUTTER_VERSION
+# bump when a genuinely new stable release is tagged. That merge is what
+# triggers this workflow (via the FLUTTER_VERSION path filter below) — so
+# a rebuild only ever happens for a real new release or a manual/
+# Dockerfile-change run, never on every incidental commit SHA change on
+# flutter/flutter's stable branch.
 on:
   push:
     branches: [main]
@@ -12,23 +20,13 @@ on:
       - Dockerfile
       - FLUTTER_VERSION
   workflow_dispatch: {}
-  schedule:
-    # Every 5 minutes — GitHub Actions' own documented minimum schedule
-    # granularity. NOT a fixed rebuild schedule — each run checks whether
-    # flutter/flutter's `stable` branch actually moved since the last
-    # build; if not, it's a no-op. This is the closest practical
-    # equivalent to instant reaction without GitHub Actions supporting
-    # real upstream webhooks for a repo we don't own.
-    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
-  actions: write
   packages: write
 
 jobs:
-  build-pinned:
-    if: github.event_name != 'schedule'
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -52,65 +50,4 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/flutter:${{ steps.pinned.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/flutter:pinned
-
-  build-stable:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      # Last-built SHA is tracked as a GitHub Actions *repository
-      # variable*, not a git-committed file — a committed file would need
-      # `git push origin main` on every build, which branch protection's
-      # required "build-check" status blocks for a non-admin token (this
-      # workflow's own GITHUB_TOKEN included), so every single tracking
-      # commit silently failed until this fix. Variables need no push at
-      # all.
-      - name: Check flutter/flutter's stable branch for new commits
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          latest_sha="$(gh api repos/flutter/flutter/commits/stable --jq '.sha')"
-          last_built_sha="$(gh variable get LAST_BUILT_SHA_STABLE --repo ${{ github.repository }} 2>/dev/null || echo none)"
-          echo "latest_sha=$latest_sha" >> "$GITHUB_OUTPUT"
-          if [ "$latest_sha" = "$last_built_sha" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "flutter/flutter@stable unchanged since last build ($latest_sha) — skipping."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "flutter/flutter@stable moved: ${last_built_sha} -> ${latest_sha}"
-          fi
-
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/setup-buildx-action@v4
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          build-args: |
-            FLUTTER_REF=stable
-          labels: |
-            org.opencontainers.image.version=stable@${{ steps.check.outputs.latest_sha }}
-          tags: |
             ghcr.io/${{ github.repository_owner }}/flutter:stable
-
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        env:
-          # GITHUB_TOKEN can read repo variables (gh variable get, above)
-          # but not write them — confirmed via a real run: `gh variable
-          # set` fails "HTTP 403: Resource not accessible by integration"
-          # even with actions:write in `permissions:`. GH_PAT_WORKFLOW
-          # (already provisioned for bot-pr-maintenance.yml) works here
-          # too; falls back to GITHUB_TOKEN so a missing secret degrades
-          # to a clear failure rather than silently no-op-ing.
-          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
-        run: |
-          gh variable set LAST_BUILT_SHA_STABLE --repo ${{ github.repository }} --body "${{ steps.check.outputs.latest_sha }}"

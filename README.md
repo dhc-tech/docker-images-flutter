@@ -22,7 +22,7 @@ registry credentials):
 
 | Tag | What it is | Pick this if you want... | Rebuilds |
 |---|---|---|---|
-| `stable` | Flutter's official **stable** channel — the tip of flutter/flutter's `stable` branch. Recommended by Flutter itself for new users and production releases | The version most people should build against day to day | Within ~5 min of a new commit landing on that branch (GitHub Actions' own minimum schedule granularity) |
+| `stable` | Flutter's official **stable** channel — always the same build as the current `<version>`/`pinned` tag below | The version most people should build against day to day | Automatically, the moment flutter/flutter's `stable` branch is tagged with a new version — see below |
 | `<version>` (e.g. `3.47.2`) / `pinned` | The exact version number of the current stable release, immutable — never silently changes under you | Reproducible builds: the same tag always means the same Flutter build, unlike `stable` which moves forward over time | Automatically, the moment flutter/flutter's `stable` branch is tagged with a new version — see below |
 
 In short: `stable` tracks whatever Flutter currently calls its stable
@@ -43,26 +43,23 @@ one to use.
 
 Nothing in this repo hardcodes "the current Flutter version" as a
 judgment call — every tag traces back to flutter/flutter's own repository
-state, checked automatically and often:
+state:
 
-- **`stable` tag** — `build-and-push.yml`'s `build-stable` job runs every
-  5 minutes (GitHub Actions' own minimum schedule granularity). Each run
-  asks the GitHub API for the current HEAD commit SHA of `flutter/
-  flutter`'s `stable` branch, compares it against the SHA this image last
-  actually built (a `LAST_BUILT_SHA_STABLE` GitHub Actions repository
-  variable — not a committed file, since branch protection blocks a
-  plain `git push` to `main` even from the workflow's own token;
-  variables need no push), and only rebuilds — and only updates that
-  recorded SHA — if the branch has genuinely moved. An unchanged branch
-  is a fast no-op, not a wasted rebuild.
-- **`<version>`/`pinned` tag** — `check-flutter-version.yml` runs every
-  5 minutes. It asks the GitHub API which commit `flutter/flutter`'s
-  `stable` branch currently points at, then which tag (if any) points at
-  that exact same commit — that tag name *is* the real, official version
-  number Flutter itself assigned to that release, straight from
-  `github.com/flutter/flutter`, not a third-party manifest or a guess. If
-  that differs from the version recorded in `FLUTTER_VERSION`, it opens a
-  PR bumping the file.
+`check-flutter-version.yml` runs every 5 minutes. It asks the GitHub API
+which commit `flutter/flutter`'s `stable` branch currently points at,
+then which tag (if any) points at that exact same commit — that tag name
+*is* the real, official version number Flutter itself assigned to that
+release, straight from `github.com/flutter/flutter`, not a third-party
+manifest or a guess. If that differs from the version recorded in
+`FLUTTER_VERSION`, it opens a PR bumping the file.
+
+Both `stable` and `<version>`/`pinned` are then built and pushed
+**together, from that same `FLUTTER_VERSION` value**, only when that PR
+merges (see `build-and-push.yml`) — not on a separate poll of
+flutter/flutter's `stable` branch. This is deliberate: the branch's HEAD
+commit can move without a new version being tagged yet, and rebuilding
+the image on every incidental commit there would mean frequent,
+pointless rebuilds that don't correspond to an actual new release.
 
 ## Fully automated release flow
 
@@ -90,8 +87,8 @@ For either:
    hard-restricted, read-only token on plain `pull_request` regardless of
    repository settings. No manual click required end to end.
 3. Merging a `FLUTTER_VERSION` bump to `main` triggers
-   `build-and-push.yml`'s `build-pinned` job, publishing the new
-   `<version>`/`pinned` tags.
+   `build-and-push.yml`'s `build` job, publishing the new
+   `<version>`/`pinned`/`stable` tags together.
 
 This entire chain was verified with a real test run, not just designed on
 paper: a manually-lowered `FLUTTER_VERSION` was detected, a real PR was
@@ -111,8 +108,7 @@ Already configured on this repo — noted here in case it's ever recreated:
 - **Branch protection on `main`**: required status check `build-check`
   (from `pr-check.yml`), strict (branch must be up to date) — this is
   also what makes `git push origin main` fail for anything but a proper
-  PR merge, which is why build state is tracked via repository variables
-  instead of a committed file (see above).
+  PR merge.
 - A label named `automated-flutter-bump` must exist on the repo (`gh
   label create`) before `check-flutter-version.yml` can apply it.
 
@@ -186,12 +182,9 @@ build:
 
 - `Dockerfile` — the image itself. `FLUTTER_REF` build arg selects the
   git ref (a version tag or a channel branch name) to install.
-- `FLUTTER_VERSION` — single source of truth for the `pinned` tag's
-  version; only ever changed by `check-flutter-version.yml`'s bot PRs.
-- `LAST_BUILT_SHA_STABLE` repository variable (Settings → Secrets and
-  variables → Actions → Variables) — last-built commit SHA for `stable`,
-  used to skip no-op rebuilds; only ever changed by `build-and-push.yml`
-  itself.
+- `FLUTTER_VERSION` — single source of truth for both the `pinned` and
+  `stable` tags' version; only ever changed by `check-flutter-version.yml`'s
+  bot PRs.
 - `.github/dependabot.yml` — keeps Actions versions and the base image
   current.
 - `.github/workflows/` — the workflows described above.
