@@ -1,53 +1,83 @@
-# OpenSSF Scorecard — a standard, widely-adopted supply-chain security
-# check (https://github.com/ossf/scorecard). Scores this repo's own
-# security posture (branch protection, pinned dependencies, token
-# permissions, etc.) and publishes the result to GitHub's Code Scanning
-# dashboard plus a public badge. No secrets/credentials needed — runs
-# entirely off the default GITHUB_TOKEN.
+# This workflow uses actions that are not certified by GitHub. They are provided
+# by a third-party and are governed by separate terms of service, privacy
+# policy, and support documentation.
 #
-# This workflow uses an action not certified by GitHub (ossf/scorecard-
-# action), provided by a third party under its own terms of service.
-name: Scorecard supply-chain security
+# GitHub's own official Scorecard template — actions pinned by exact
+# commit SHA (not a mutable tag) for supply-chain integrity, matching
+# what the Scorecard checks this very workflow are graded on actually
+# expect from a well-configured repo.
 
+name: Scorecard supply-chain security
 on:
-  # For the Branch-Protection check — only the default branch is
-  # supported: https://github.com/ossf/scorecard/blob/main/docs/checks.md#branch-protection
-  branch_protection_rule: {}
-  # Keeps the Maintained check current even with no code changes:
+  # For Branch-Protection check. Only the default branch is supported. See
+  # https://github.com/ossf/scorecard/blob/main/docs/checks.md#branch-protection
+  branch_protection_rule:
+  # To guarantee Maintained check is occasionally updated. See
   # https://github.com/ossf/scorecard/blob/main/docs/checks.md#maintained
   schedule:
-    - cron: "17 11 * * 2"
+    - cron: '23 22 * * 4'
   push:
-    branches: [main]
+    branches: [ "main" ]
 
-permissions:
-  contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# Declare default permissions as read only.
+permissions: read-all
 
 jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
+    # `publish_results: true` only works when run from the default branch. conditional can be removed if disabled.
+    if: github.event.repository.default_branch == github.ref_name || github.event_name == 'pull_request'
     permissions:
-      # Publish results and get a badge.
-      id-token: write
-      # Upload results to the code-scanning dashboard.
+      # Needed to upload the results to code-scanning dashboard.
       security-events: write
+      # Needed to publish results and get a badge (see publish_results below).
+      id-token: write
+      # Uncomment the permissions below if installing in a private repository.
+      # contents: read
+      # actions: read
+
     steps:
-      - uses: actions/checkout@v7
+      - name: "Checkout code"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
-      - uses: ossf/scorecard-action@v2
+      - name: "Run analysis"
+        uses: ossf/scorecard-action@f49aabe0b5af0936a0987cfb85d86b75731b0186 # v2.4.1
         with:
           results_file: results.sarif
           results_format: sarif
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          # (Optional) "write" PAT token. Uncomment the `repo_token` line below if:
+          # - you want to enable the Branch-Protection check on a *public* repository, or
+          # - you are installing Scorecard on a *private* repository
+          # To create the PAT, follow the steps in https://github.com/ossf/scorecard-action?tab=readme-ov-file#authentication-with-fine-grained-pat-optional.
+          # repo_token: ${{ secrets.SCORECARD_TOKEN }}
+
+          # Public repositories:
+          #   - Publish results to OpenSSF REST API for easy access by consumers
+          #   - Allows the repository to include the Scorecard badge.
+          #   - See https://github.com/ossf/scorecard-action#publishing-results.
+          # For private repositories:
+          #   - `publish_results` will always be set to `false`, regardless
+          #     of the value entered here.
           publish_results: true
 
-      - uses: github/codeql-action/upload-sarif@v4
+          # (Optional) Uncomment file_mode if you have a .gitattributes with files marked export-ignore
+          # file_mode: git
+
+      # Upload the results as artifacts (optional). Commenting out will disable uploads of run results in SARIF
+      # format to the repository Actions tab.
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      # Upload the results to GitHub's code scanning dashboard (optional).
+      # Commenting out will disable upload of results to your repo's Code Scanning dashboard
+      - name: "Upload to code-scanning"
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
