@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Pre-commit / Python caches if any tools use it
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Docker build caches
+.docker/
+*.tar.gz

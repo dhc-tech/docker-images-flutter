@@ -1,0 +1,14 @@
+schemaVersion: "2.0.0"
+metadataTest:
+  envVars:
+    - key: "FLUTTER_HOME"
+      value: "/opt/flutter"
+commandTests:
+  - name: "Check Firebase CLI"
+    command: "firebase"
+    args: ["--version"]
+    expectedOutput: ["[0-9]+\\.[0-9]+\\.[0-9]+"]
+  - name: "Check git Installation"
+    command: "git"
+    args: ["--version"]
+    expectedOutput: ["git version"]

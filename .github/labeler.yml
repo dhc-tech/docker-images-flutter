@@ -1,0 +1,15 @@
+docker:
+  - any:
+      - 'docker/*.Dockerfile'
+      - 'docker/Dockerfile'
+
+github-actions:
+  - any:
+      - '.github/workflows/*'
+      - '.github/dependabot.yml'
+
+documentation:
+  - any:
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'LICENSE'

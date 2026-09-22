@@ -12,17 +12,17 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
-  pull-requests: write
-  # Labels live under the Issues REST endpoint (/repos/.../labels) —
-  # `gh label create` below needs issues:write, not pull-requests:write.
-  issues: write
+  contents: read
 
 jobs:
   check:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Get latest stable version directly from github.com/flutter/flutter
         id: latest

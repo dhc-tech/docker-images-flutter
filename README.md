@@ -66,10 +66,7 @@ day-to-day and reproducible builds. See
 [docs.flutter.dev/release/upgrade](https://docs.flutter.dev/release/upgrade)
 for Flutter's own explanation of its channels.
 
-There is no `latest` tag — `stable` already means exactly that (Flutter's
-own current stable release), so a separate `latest` alias would only
-duplicate `stable` under a second name and invite confusion about which
-one to use.
+Docker image tags follow strict Semantic Versioning (`3.x.x`, `3.x`, `3`, `latest`, `stable`).
 
 ## How versions are resolved
 
@@ -93,6 +90,21 @@ flutter/flutter's `stable` branch. This is deliberate: the branch's HEAD
 commit can move without a new version being tagged yet, and rebuilding
 the image on every incidental commit there would mean frequent,
 pointless rebuilds that don't correspond to an actual new release.
+
+
+## Enterprise-Grade CI/CD & DevOps Automation
+
+This repository employs strict, industry-standard DevOps practices to ensure secure, reproducible, and optimized builds:
+
+- **Semantic Versioning & Docker Metadata:** Docker images are tagged properly using `docker/metadata-action`, supporting major, minor, and patch SemVer tags (e.g., `3`, `3.24`, `3.24.2`, `latest`, `stable`). Standard OCI metadata labels (`org.opencontainers.image.source`, `org.opencontainers.image.licenses`, etc.) are natively embedded.
+- **Supply Chain Security:** All GitHub Action dependencies are pinned to absolute 40-character SHA hashes. Base Docker images (like `ubuntu:26.04`) are pinned to SHA256 digests to protect against supply-chain poisoning.
+- **Continuous Integration Quality Gates:** 
+  - **Hadolint** runs on all Pull Requests to statically analyze and enforce Dockerfile best practices.
+  - **Yamllint** ensures strict, clean YAML formatting across all GitHub Actions workflows.
+- **Automated Dependency Management:** Dependabot runs weekly to keep base images and GitHub actions updated, utilizing **Dependabot Groups** to bundle all updates into single, manageable PRs.
+- **Context Optimization:** A strict `.dockerignore` file prevents unnecessary repository files from entering the Docker build context, keeping build speeds lightning fast.
+- **Issue & PR Lifecycle:** An automated stale bot closes inactive issues/PRs after 37 days of inactivity. User Pull Requests are automatically labeled by modified paths (e.g., `docker`, `github-actions`) using a sophisticated labeler workflow.
+- **Security Posture:** Ranked and validated by the **OpenSSF Scorecard** for high compliance with open-source security standards, maintaining minimal workflow token permissions (`contents: read` at the top level, write access escalated only per-job).
 
 ## Fully automated release flow
 
@@ -161,7 +173,7 @@ actually changing) — you never touch this line again.
 
 **Reproducible builds — freeze one exact Flutter version forever:**
 ```yaml
-image: ghcr.io/dhc-tech/flutter-android:3.47.2   # or flutter-web / flutter-linux / flutter
+image: ghcr.io/dhc-tech/flutter-android:3.24.2   # or 3.24, or 3   # or flutter-web / flutter-linux / flutter
 ```
 Never changes. Use this if you need every build to use the *exact* same
 Flutter SDK build over build, and are fine manually bumping the tag

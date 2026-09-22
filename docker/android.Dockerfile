@@ -9,6 +9,8 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openjdk-21-jdk-headless \
     && apt-get clean \
@@ -38,18 +40,18 @@ RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
 # the first time it's built — https://developer.android.com/studio/intro/update#download-with-gradle.
 # This image works unmodified for any project's SDK level, current or
 # future, without ever needing a version bump here.
-RUN yes | sdkmanager --licenses \
+RUN yes | sdkmanager --licenses || [ "${PIPESTATUS[1]}" -eq 0 ] \
     && sdkmanager "platform-tools" \
     && rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache
 
 # cmake for native/NDK builds — not covered by Gradle's own auto-download,
 # and Flutter has no official pinned constant for it (unlike compileSdk/
 # ndkVersion below), so this is a plain static version.
-RUN yes | sdkmanager --licenses \
+RUN yes | sdkmanager --licenses || [ "${PIPESTATUS[1]}" -eq 0 ] \
     && sdkmanager "cmake;3.22.1" \
     && rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache
 
-RUN yes | flutter doctor --android-licenses \
+RUN yes | flutter doctor --android-licenses || [ "${PIPESTATUS[1]}" -eq 0 ] \
     && flutter doctor -v \
     && flutter precache --android
 
