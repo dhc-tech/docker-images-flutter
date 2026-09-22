@@ -1,36 +1,45 @@
 name: Build and push CI image
 
-# Builds Android + Web + Linux desktop. Docker/Linux can't build iOS,
-# macOS, or Windows at all — needs the real OS. See README.md.
+# Publishes two families of images — both Android/Web/Linux-capable in
+# total, but split differently:
+# - `flutter` (root Dockerfile, build-combo below) — one all-in-one
+#   image with Android + Web + Linux desktop tooling together.
+# - `flutter-android`/`flutter-web`/`flutter-linux` (build-platforms
+#   below) — the same coverage split into 3 images, each built FROM the
+#   shared base.Dockerfile plus only its own platform's tooling, so an
+#   Android-only consumer doesn't pull Chrome or the Linux desktop
+#   toolchain, and so on.
+# Docker/Linux can't build iOS, macOS, or Windows at all — needs the
+# real OS. See README.md.
+#
+# Only `stable` (mutable) and `pinned`/`<version>` (immutable) tags are
+# published for either family — no `beta`/`main` channel tags.
+#
+# No polling/schedule here on purpose: check-flutter-version.yml already
+# polls flutter/flutter every 15 minutes and only merges a FLUTTER_VERSION
+# bump when a genuinely new stable release is tagged. That merge is what
+# triggers this workflow (via the FLUTTER_VERSION path filter below) — so
+# a rebuild only ever happens for a real new release or a manual/
+# Dockerfile-change run, never on every incidental commit SHA change on
+# flutter/flutter's stable branch.
 on:
   push:
     branches: [main]
     paths:
       - Dockerfile
+      - base.Dockerfile
+      - android.Dockerfile
+      - web.Dockerfile
+      - linux.Dockerfile
       - FLUTTER_VERSION
   workflow_dispatch: {}
-  schedule:
-    # Every 5 minutes — GitHub Actions' own documented minimum schedule
-    # granularity — for `stable` only (see build-stable below). NOT a
-    # fixed rebuild schedule — each run checks whether flutter/flutter's
-    # branch actually moved since the last build; if not, it's a no-op.
-    # This is the closest practical equivalent to instant reaction
-    # without GitHub Actions supporting real upstream webhooks for a repo
-    # we don't own.
-    - cron: "*/5 * * * *"
-    # `beta`/`main` aren't what this image's consumers build against day
-    # to day — checked once a day (see build-daily-channels below) rather
-    # than every 5 minutes.
-    - cron: "43 7 * * *"
 
 permissions:
   contents: read
-  actions: write
   packages: write
 
 jobs:
-  build-pinned:
-    if: github.event_name != 'schedule'
+  build-combo:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -54,131 +63,60 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/flutter:${{ steps.pinned.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/flutter:pinned
-
-  build-stable:
-    # On the 5-minute cron, only this job runs — build-daily-channels
-    # (below) sits this one out via its own matching condition, so a
-    # schedule-triggered run of this workflow never builds both crons'
-    # channels at once.
-    if: github.event.schedule != '43 7 * * *'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      # Last-built SHA is tracked as a GitHub Actions *repository
-      # variable*, not a git-committed file — a committed file would need
-      # `git push origin main` on every build, which branch protection's
-      # required "build-check" status blocks for a non-admin token (this
-      # workflow's own GITHUB_TOKEN included), so every single tracking
-      # commit silently failed until this fix. Variables need no push at
-      # all.
-      - name: Check flutter/flutter's stable branch for new commits
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          latest_sha="$(gh api repos/flutter/flutter/commits/stable --jq '.sha')"
-          last_built_sha="$(gh variable get LAST_BUILT_SHA_STABLE --repo ${{ github.repository }} 2>/dev/null || echo none)"
-          echo "latest_sha=$latest_sha" >> "$GITHUB_OUTPUT"
-          if [ "$latest_sha" = "$last_built_sha" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "flutter/flutter@stable unchanged since last build ($latest_sha) — skipping."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "flutter/flutter@stable moved: ${last_built_sha} -> ${latest_sha}"
-          fi
-
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/setup-buildx-action@v4
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          build-args: |
-            FLUTTER_REF=stable
-          labels: |
-            org.opencontainers.image.version=stable@${{ steps.check.outputs.latest_sha }}
-          tags: |
             ghcr.io/${{ github.repository_owner }}/flutter:stable
+          # Shares the same GitHub Actions cache pr-check.yml already
+          # warms on every PR — the base OS/Android/Chrome layers (slow,
+          # network-heavy) are reused here instead of rebuilt from
+          # scratch on every version bump.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        env:
-          # GITHUB_TOKEN can read repo variables (gh variable get, above)
-          # but not write them — confirmed via a real run: `gh variable
-          # set` fails "HTTP 403: Resource not accessible by integration"
-          # even with actions:write in `permissions:`. GH_PAT_WORKFLOW
-          # (already provisioned for merge-queue-fallback.yml) works here
-          # too; falls back to GITHUB_TOKEN so a missing secret degrades
-          # to a clear failure rather than silently no-op-ing.
-          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
-        run: |
-          gh variable set LAST_BUILT_SHA_STABLE --repo ${{ github.repository }} --body "${{ steps.check.outputs.latest_sha }}"
-
-  build-daily-channels:
-    # Only on the daily cron, a manual run, or a Dockerfile/FLUTTER_VERSION
-    # push — never on the 5-minute schedule (that's build-stable's).
-    if: github.event_name != 'schedule' || github.event.schedule == '43 7 * * *'
+  build-platforms:
     strategy:
       fail-fast: false
       matrix:
-        channel: [beta, main]
+        platform: [android, web, linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - name: Check flutter/flutter's ${{ matrix.channel }} branch for new commits
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          latest_sha="$(gh api repos/flutter/flutter/commits/${{ matrix.channel }} --jq '.sha')"
-          var_name="LAST_BUILT_SHA_$(echo "${{ matrix.channel }}" | tr '[:lower:]' '[:upper:]')"
-          last_built_sha="$(gh variable get "$var_name" --repo ${{ github.repository }} 2>/dev/null || echo none)"
-          echo "latest_sha=$latest_sha" >> "$GITHUB_OUTPUT"
-          echo "var_name=$var_name" >> "$GITHUB_OUTPUT"
-          if [ "$latest_sha" = "$last_built_sha" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "flutter/flutter@${{ matrix.channel }} unchanged since last build ($latest_sha) — skipping."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "flutter/flutter@${{ matrix.channel }} moved: ${last_built_sha} -> ${latest_sha}"
-          fi
-
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/login-action@v4
+      - name: Read pinned Flutter version
+        id: pinned
+        run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: docker/setup-buildx-action@v4
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build shared base layer
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: base.Dockerfile
+          push: false
+          load: true
+          tags: flutter-base:build
+          build-args: |
+            FLUTTER_REF=${{ steps.pinned.outputs.version }}
+          # Shared cache scope across all 3 matrix jobs — the base
+          # layer's content is identical for android/web/linux, so a
+          # cache warmed by one platform's job speeds up the others too.
+          cache-from: type=gha,scope=flutter-base
+          cache-to: type=gha,mode=max,scope=flutter-base
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.platform }}.Dockerfile
           push: true
           build-args: |
-            FLUTTER_REF=${{ matrix.channel }}
+            BASE_IMAGE=flutter-base:build
           labels: |
-            org.opencontainers.image.version=${{ matrix.channel }}@${{ steps.check.outputs.latest_sha }}
+            org.opencontainers.image.version=${{ steps.pinned.outputs.version }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/flutter:${{ matrix.channel }}
-
-      - if: steps.check.outputs.changed == 'true' || github.event_name != 'schedule'
-        env:
-          # See the matching comment in build-stable above — GITHUB_TOKEN
-          # cannot write repo variables regardless of `permissions:`.
-          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
-        run: |
-          gh variable set "${{ steps.check.outputs.var_name }}" \
-            --repo ${{ github.repository }} \
-            --body "${{ steps.check.outputs.latest_sha }}"
+            ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:${{ steps.pinned.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:pinned
+            ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:stable
+          cache-from: type=gha,scope=flutter-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=flutter-${{ matrix.platform }}

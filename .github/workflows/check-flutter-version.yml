@@ -2,19 +2,21 @@ name: Check for new Flutter stable release
 
 on:
   schedule:
-    # Every 5 minutes — GitHub Actions' own documented minimum schedule
-    # granularity. A new stable release is really just flutter/flutter's
-    # `stable` branch moving to a new tagged commit, so this polls often
-    # and only acts when that actually happened (idempotent against an
-    # already-open bump PR, below), which is as close to "the moment
-    # Flutter tags a release" as a repo we don't own can get without a
-    # real webhook.
-    - cron: "*/5 * * * *"
+    # Every 15 minutes, not GitHub Actions' minimum 5 — a new stable
+    # release is a quarterly event, so polling 3x more often than this
+    # buys negligible responsiveness (worst case ~10 extra minutes of
+    # delay) at 3x the Actions-minutes cost. Idempotent against an
+    # already-open bump PR (below), so a run overlapping a prior one is
+    # always a safe no-op regardless of interval.
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 permissions:
   contents: write
   pull-requests: write
+  # Labels live under the Issues REST endpoint (/repos/.../labels) —
+  # `gh label create` below needs issues:write, not pull-requests:write.
+  issues: write
 
 jobs:
   check:
@@ -60,6 +62,14 @@ jobs:
           NEW_VERSION: ${{ steps.latest.outputs.version }}
           OLD_VERSION: ${{ steps.compare.outputs.current }}
         run: |
+          # Idempotent — a no-op once the label already exists. Removes the
+          # manual "create this label by hand" one-time setup step for
+          # anyone recreating this repo's automation from scratch.
+          gh label create "automated-flutter-bump" \
+            --color "1D76DB" \
+            --description "Opened automatically by check-flutter-version.yml" \
+            --force
+
           branch="flutter-bump/${NEW_VERSION}"
           # Idempotent against a genuinely open bump PR — NOT against the
           # branch merely existing. A merged/closed PR's branch (normally

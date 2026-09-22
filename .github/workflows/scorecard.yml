@@ -1,0 +1,53 @@
+# OpenSSF Scorecard — a standard, widely-adopted supply-chain security
+# check (https://github.com/ossf/scorecard). Scores this repo's own
+# security posture (branch protection, pinned dependencies, token
+# permissions, etc.) and publishes the result to GitHub's Code Scanning
+# dashboard plus a public badge. No secrets/credentials needed — runs
+# entirely off the default GITHUB_TOKEN.
+#
+# This workflow uses an action not certified by GitHub (ossf/scorecard-
+# action), provided by a third party under its own terms of service.
+name: Scorecard supply-chain security
+
+on:
+  # For the Branch-Protection check — only the default branch is
+  # supported: https://github.com/ossf/scorecard/blob/main/docs/checks.md#branch-protection
+  branch_protection_rule: {}
+  # Keeps the Maintained check current even with no code changes:
+  # https://github.com/ossf/scorecard/blob/main/docs/checks.md#maintained
+  schedule:
+    - cron: "17 11 * * 2"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Publish results and get a badge.
+      id-token: write
+      # Upload results to the code-scanning dashboard.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_results: true
+
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
