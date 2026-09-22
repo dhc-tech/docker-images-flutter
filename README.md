@@ -11,16 +11,38 @@ this image ever ships is resolved **dynamically from
 directly** — nothing here is a hand-picked or hardcoded Flutter version;
 see [How versions are resolved](#how-versions-are-resolved) below.
 
-Builds **Android, Web, and Linux desktop**. Does **not** and cannot build
-iOS, macOS, or Windows — those need the real OS + toolchain (Xcode on
-macOS, MSVC on Windows). That's an Apple/Microsoft platform requirement,
-not something this image chooses to omit, and no Docker/Linux container
-anywhere can do it.
+Covers **Android, Web, and Linux desktop** — as either one all-in-one
+image, or three separate per-platform images (see
+[Which image should I use](#which-image-should-i-use) below). Does
+**not** and cannot build iOS, macOS, or Windows — those need the real OS
++ toolchain (Xcode on macOS, MSVC on Windows). That's an Apple/Microsoft
+platform requirement, not something this image chooses to omit, and no
+Docker/Linux container anywhere can do it.
+
+## Which image should I use
+
+Two families, both public on `ghcr.io/dhc-tech` (pull with no registry
+credentials), both resolving Flutter versions the exact same way (see
+[How versions are resolved](#how-versions-are-resolved)):
+
+| Image | What it has | Pick this if you want... |
+|---|---|---|
+| `flutter` | Android SDK + Chrome + Linux desktop toolchain, all in one image | Building for more than one platform in the same pipeline, or you don't care about image size |
+| `flutter-android` | Just the Android SDK | Only building Android — no Chrome, no Linux desktop toolchain wasting your pull time/bandwidth |
+| `flutter-web` | Just Chrome | Only building Web |
+| `flutter-linux` | Just the Linux desktop toolchain | Only building Linux desktop |
+
+The 3 split images exist because most consumers only build for one
+platform in a given pipeline — bundling all three into every image means
+an Android-only build pulls Chrome and the Linux desktop toolchain for no
+reason, on every pull, in every CI run. `flutter` (the original,
+all-in-one image) is kept alongside them, unchanged, for anyone who
+builds multiple platforms in one pipeline and would otherwise need to
+pull multiple split images anyway.
 
 ## Tags
 
-Published to `ghcr.io/dhc-tech/flutter` (public — pull it with no
-registry credentials):
+Every image above uses the same two tags:
 
 | Tag | What it is | Pick this if you want... | Rebuilds |
 |---|---|---|---|
@@ -30,9 +52,9 @@ registry credentials):
 In short: `stable` tracks whatever Flutter currently calls its stable
 release (moves over time, ~quarterly); `<version>`/`pinned` freezes that
 same release at one exact number (never moves). Only these two are
-published here — Flutter's `beta` and `main` channels are intentionally
-not built, to keep this image's surface to what's actually recommended
-for day-to-day and reproducible builds. See
+published — Flutter's `beta` and `main` channels are intentionally not
+built, to keep this image's surface to what's actually recommended for
+day-to-day and reproducible builds. See
 [docs.flutter.dev/release/upgrade](https://docs.flutter.dev/release/upgrade)
 for Flutter's own explanation of its channels.
 
@@ -55,9 +77,10 @@ release, straight from `github.com/flutter/flutter`, not a third-party
 manifest or a guess. If that differs from the version recorded in
 `FLUTTER_VERSION`, it opens a PR bumping the file.
 
-Both `stable` and `<version>`/`pinned` are then built and pushed
-**together, from that same `FLUTTER_VERSION` value**, only when that PR
-merges (see `build-and-push.yml`) — not on a separate poll of
+`stable` and `<version>`/`pinned` are then built and pushed **together,
+from that same `FLUTTER_VERSION` value**, for all 4 images (`flutter`,
+`flutter-android`, `flutter-web`, `flutter-linux`) — only when that PR
+merges (see `build-and-push.yml`), not on a separate poll of
 flutter/flutter's `stable` branch. This is deliberate: the branch's HEAD
 commit can move without a new version being tagged yet, and rebuilding
 the image on every incidental commit there would mean frequent,
@@ -89,8 +112,9 @@ For either:
    hard-restricted, read-only token on plain `pull_request` regardless of
    repository settings. No manual click required end to end.
 3. Merging a `FLUTTER_VERSION` bump to `main` triggers
-   `build-and-push.yml`'s `build` job, publishing the new
-   `<version>`/`pinned`/`stable` tags together.
+   `build-and-push.yml`'s `build-combo` and `build-platforms` jobs,
+   publishing the new `<version>`/`pinned`/`stable` tags for all 4
+   images together.
 
 This entire chain was verified with a real test run, not just designed on
 paper: a manually-lowered `FLUTTER_VERSION` was detected, a real PR was
@@ -114,12 +138,12 @@ Already configured on this repo — noted here in case it's ever recreated:
 
 ## Usage
 
-Pick a tag based on what you actually want — same 2 options as the table
-above, spelled out as copy-pasteable `image:` lines:
+First pick an image from the table in
+[Which image should I use](#which-image-should-i-use), then a tag:
 
 **Most people, most of the time — track official Flutter stable:**
 ```yaml
-image: ghcr.io/dhc-tech/flutter:stable
+image: ghcr.io/dhc-tech/flutter-android:stable   # or flutter-web / flutter-linux / flutter
 ```
 Always builds against whatever Flutter itself currently calls its stable
 release. Moves forward automatically (~quarterly, within ~15 min of it
@@ -127,7 +151,7 @@ actually changing) — you never touch this line again.
 
 **Reproducible builds — freeze one exact Flutter version forever:**
 ```yaml
-image: ghcr.io/dhc-tech/flutter:3.47.2
+image: ghcr.io/dhc-tech/flutter-android:3.47.2   # or flutter-web / flutter-linux / flutter
 ```
 Never changes. Use this if you need every build to use the *exact* same
 Flutter SDK build over build, and are fine manually bumping the tag
@@ -143,19 +167,19 @@ version in its own name — carries an
 was built from, so you never have to guess:
 
 ```bash
-docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' ghcr.io/dhc-tech/flutter:stable
+docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' ghcr.io/dhc-tech/flutter-android:stable
 ```
 
 or without pulling the image, via the GHCR API:
 
 ```bash
-docker manifest inspect ghcr.io/dhc-tech/flutter:stable
+docker manifest inspect ghcr.io/dhc-tech/flutter-android:stable
 ```
 
 ## CI usage examples
 
-Copy-pasteable snippets for running this image as the build container in a
-few common CI systems — swap the tag for whichever one you picked in
+Copy-pasteable snippets for running an image as the build container in a
+few common CI systems — swap in whichever image/tag you picked in
 [Usage](#usage) above.
 
 **GitHub Actions:**
@@ -164,7 +188,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dhc-tech/flutter:stable
+      image: ghcr.io/dhc-tech/flutter-android:stable
     steps:
       - uses: actions/checkout@v7
       - run: flutter build apk
@@ -173,18 +197,35 @@ jobs:
 **GitLab CI:**
 ```yaml
 build:
-  image: ghcr.io/dhc-tech/flutter:stable
+  image: ghcr.io/dhc-tech/flutter-android:stable
   script:
     - flutter build apk
 ```
 
+**Bitbucket Pipelines:**
+```yaml
+pipelines:
+  default:
+    - step:
+        image: ghcr.io/dhc-tech/flutter-android:stable
+        script:
+          - flutter build apk
+```
+
 ## Repo layout
 
-- `Dockerfile` — the image itself. `FLUTTER_REF` build arg selects the
-  git ref (a version tag or a channel branch name) to install.
-- `FLUTTER_VERSION` — single source of truth for both the `pinned` and
-  `stable` tags' version; only ever changed by `check-flutter-version.yml`'s
-  bot PRs.
+- `Dockerfile` — the all-in-one `flutter` image (Android + Web + Linux
+  together). `FLUTTER_REF` build arg selects the git ref (a version tag
+  or a channel branch name) to install.
+- `base.Dockerfile` — shared layer (Ubuntu, Firebase CLI, the Flutter
+  SDK itself) for the 3 split images below. Not published on its own.
+- `android.Dockerfile` / `web.Dockerfile` / `linux.Dockerfile` — each
+  builds `FROM` a locally-built `base.Dockerfile` (via the `BASE_IMAGE`
+  build-arg — see `build-and-push.yml`) plus only that platform's own
+  tooling, publishing `flutter-android`/`flutter-web`/`flutter-linux`.
+- `FLUTTER_VERSION` — single source of truth for every image's `pinned`
+  and `stable` tags' version; only ever changed by
+  `check-flutter-version.yml`'s bot PRs.
 - `.github/dependabot.yml` — keeps Actions versions and the base image
   current.
 - `.github/workflows/` — the workflows described above, plus
