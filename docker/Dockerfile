@@ -14,7 +14,9 @@
 # not something this image chooses to omit.
 #
 # FLUTTER_REF: a git tag (e.g. 3.47.2) or branch name (stable/beta/main).
-FROM ubuntu:26.04
+FROM ubuntu:26.04@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
+
+SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=en_US.UTF-8 \
@@ -91,7 +93,7 @@ RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
 # the first time it's built — https://developer.android.com/studio/intro/update#download-with-gradle.
 # This image works unmodified for any project's SDK level, current or
 # future, without ever needing a version bump here.
-RUN yes | sdkmanager --licenses \
+RUN yes | sdkmanager --licenses || [ "${PIPESTATUS[1]}" -eq 0 ] \
     && sdkmanager "platform-tools" \
     && rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache
 
@@ -104,7 +106,7 @@ RUN yes | sdkmanager --licenses \
 # automatically from compileSdk, https://developer.android.com/studio/intro/update#download-with-gradle),
 # and compileSdk itself is installed dynamically below, after Flutter is
 # cloned, from flutter.compileSdkVersion — same reasoning as ndkVersion.
-RUN yes | sdkmanager --licenses \
+RUN yes | sdkmanager --licenses || [ "${PIPESTATUS[1]}" -eq 0 ] \
     && sdkmanager "cmake;3.22.1" \
     # sdkmanager leaves downloaded zips/temp files under the SDK root that
     # aren't needed once a package is unpacked — remove them to keep this
@@ -126,7 +128,7 @@ ENV FLUTTER_HOME=/opt/flutter
 ENV PATH="${FLUTTER_HOME}/bin:${FLUTTER_HOME}/bin/cache/dart-sdk/bin:${PATH}"
 
 RUN git clone --depth 1 --branch "${FLUTTER_REF}" https://github.com/flutter/flutter.git "${FLUTTER_HOME}" \
-    && yes | flutter doctor --android-licenses \
+    && yes | flutter doctor --android-licenses || [ "${PIPESTATUS[1]}" -eq 0 ] \
     && flutter config --enable-linux-desktop \
     && flutter doctor -v \
     && flutter precache --android --linux --web

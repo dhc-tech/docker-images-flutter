@@ -8,6 +8,8 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+
 # https://docs.flutter.dev/platform-integration/linux/building
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

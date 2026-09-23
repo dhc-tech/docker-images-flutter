@@ -8,6 +8,8 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+
 # Real Chrome for `flutter test --platform chrome` /
 # `flutter drive -d web-server` — https://docs.flutter.dev/testing/integration-tests.
 #

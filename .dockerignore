@@ -1,0 +1,9 @@
+.git
+.github
+.dockerignore
+README.md
+LICENSE
+SECURITY.md
+FLUTTER_VERSION
+docker/*.Dockerfile
+Dockerfile

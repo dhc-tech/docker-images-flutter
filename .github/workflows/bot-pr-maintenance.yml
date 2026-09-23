@@ -42,12 +42,13 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
-  pull-requests: write
-  actions: write
+  contents: read
 
 jobs:
   trusted-prs:
+    permissions:
+      pull-requests: read
+
     runs-on: ubuntu-latest
     outputs:
       prs: ${{ steps.resolve.outputs.prs }}
@@ -70,6 +71,8 @@ jobs:
   approve-runs:
     needs: trusted-prs
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,6 +106,9 @@ jobs:
   advance-prs:
     needs: trusted-prs
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - env:
           GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}

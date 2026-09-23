@@ -2,7 +2,7 @@ name: PR build check
 
 # Validates a PR actually builds before it's allowed to auto-merge — see
 # auto-merge.yml. Build-only, no push (PRs don't get package write
-# access). Runs on every PR to main, not just Dockerfile/FLUTTER_VERSION
+# access). Runs on every PR to main, not just docker/Dockerfile/FLUTTER_VERSION
 # changes: Dependabot's github-actions PRs touch workflow files, and if
 # this check never ran for those, the "build-check" required status
 # (branch protection) would never be satisfied and the PR would sit
@@ -30,7 +30,7 @@ jobs:
       # to the `else` branch and skipped the actual Docker build, so
       # this required check had been passing on every PR without ever
       # building anything.
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -49,23 +49,32 @@ jobs:
           # to "not affected" — exactly the bug fetch-depth: 0 above
           # fixes, but this is the backstop if it ever regresses.
           changed_files="$(git diff --name-only "$base" "$head")"
-          if echo "$changed_files" | grep -qE '^(Dockerfile|FLUTTER_VERSION)$'; then
+          if echo "$changed_files" | grep -qE '^(docker/Dockerfile|FLUTTER_VERSION)$'; then
             echo "affected=true" >> "$GITHUB_OUTPUT"
           else
             echo "affected=false" >> "$GITHUB_OUTPUT"
-            echo "No Dockerfile/FLUTTER_VERSION change — skipping the image build."
+            echo "No docker/Dockerfile/FLUTTER_VERSION change — skipping the image build."
           fi
 
       - if: steps.changed.outputs.affected == 'true'
         name: Read pinned Flutter version
         id: pinned
         run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+      - name: Install container-structure-test
+        if: steps.changed.outputs.affected == 'true'
+        run: |
+          curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64
+          chmod +x container-structure-test-linux-amd64
+          sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
       - if: steps.changed.outputs.affected == 'true'
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       - if: steps.changed.outputs.affected == 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
+          file: docker/Dockerfile
+          load: true
+          tags: flutter:build
           push: false
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
@@ -76,6 +85,10 @@ jobs:
           # re-installing everything from scratch every time.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Run container-structure-test
+        if: steps.changed.outputs.affected == 'true'
+        run: container-structure-test test --image flutter:build --config tests/flutter-combo.yaml
 
   # A required status check on main, same as build-check (see README's
   # "One-time repo setup") — configured as 3 separate required contexts,
@@ -89,7 +102,7 @@ jobs:
     steps:
       # fetch-depth: 0 — see the matching comment on build-check above;
       # same shallow-clone bug, same silent-skip failure mode.
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -101,11 +114,11 @@ jobs:
           head="${{ github.event.pull_request.head.sha }}"
           changed_files="$(git diff --name-only "$base" "$head")"
           if echo "$changed_files" \
-              | grep -qE "^(base\.Dockerfile|${{ matrix.platform }}\.Dockerfile|FLUTTER_VERSION)$"; then
+              | grep -qE "^(docker/base\.Dockerfile|docker/${{ matrix.platform }}\.Dockerfile|FLUTTER_VERSION)$"; then
             echo "affected=true" >> "$GITHUB_OUTPUT"
           else
             echo "affected=false" >> "$GITHUB_OUTPUT"
-            echo "No relevant Dockerfile/FLUTTER_VERSION change for ${{ matrix.platform }} — skipping."
+            echo "No relevant docker/Dockerfile/FLUTTER_VERSION change for ${{ matrix.platform }} — skipping."
           fi
 
       - if: steps.changed.outputs.affected == 'true'
@@ -122,27 +135,37 @@ jobs:
       # engine, so the image is visible immediately — confirmed against
       # a real failed run even after trying the documented
       # `docker-image://` build-context workaround.
+      - name: Install container-structure-test
+        if: steps.changed.outputs.affected == 'true'
+        run: |
+          curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64
+          chmod +x container-structure-test-linux-amd64
+          sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
       - if: steps.changed.outputs.affected == 'true'
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: docker
 
       - if: steps.changed.outputs.affected == 'true'
         name: Build shared base layer
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
-          file: base.Dockerfile
+          file: docker/base.Dockerfile
           load: true
           tags: flutter-base:build
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
 
+      - name: Run container-structure-test (Base)
+        if: steps.changed.outputs.affected == 'true'
+        run: container-structure-test test --image flutter-base:build --config tests/flutter-base.yaml
+
       - if: steps.changed.outputs.affected == 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
-          file: ${{ matrix.platform }}.Dockerfile
+          file: docker/${{ matrix.platform }}.Dockerfile
           push: false
           build-args: |
             BASE_IMAGE=flutter-base:build

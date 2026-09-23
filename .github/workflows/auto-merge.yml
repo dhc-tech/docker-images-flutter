@@ -21,11 +21,13 @@ on:
     types: [opened, labeled, reopened]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   enable-auto-merge:
+    permissions:
+      contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       # Fetches the PR's current label/author fresh via the API rather

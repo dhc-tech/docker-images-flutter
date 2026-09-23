@@ -1,0 +1,6 @@
+# Global Rules for AI Assistants
+Read `CLAUDE.md` and `AGENT.md` for core repository knowledge.
+
+- Enforce `pre-commit` hooks locally.
+- Use `container-structure-test` for image verification.
+- Always use `SHELL ["/bin/bash", "-eo", "pipefail", "-c"]` in Dockerfiles.

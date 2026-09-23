@@ -2,11 +2,11 @@ name: Build and push CI image
 
 # Publishes two families of images — both Android/Web/Linux-capable in
 # total, but split differently:
-# - `flutter` (root Dockerfile, build-combo below) — one all-in-one
+# - `flutter` (root docker/Dockerfile, build-combo below) — one all-in-one
 #   image with Android + Web + Linux desktop tooling together.
 # - `flutter-android`/`flutter-web`/`flutter-linux` (build-platforms
 #   below) — the same coverage split into 3 images, each built FROM the
-#   shared base.Dockerfile plus only its own platform's tooling, so an
+#   shared docker/base.Dockerfile plus only its own platform's tooling, so an
 #   Android-only consumer doesn't pull Chrome or the Linux desktop
 #   toolchain, and so on.
 # Docker/Linux can't build iOS, macOS, or Windows at all — needs the
@@ -20,50 +20,64 @@ name: Build and push CI image
 # bump when a genuinely new stable release is tagged. That merge is what
 # triggers this workflow (via the FLUTTER_VERSION path filter below) — so
 # a rebuild only ever happens for a real new release or a manual/
-# Dockerfile-change run, never on every incidental commit SHA change on
+# docker/Dockerfile-change run, never on every incidental commit SHA change on
 # flutter/flutter's stable branch.
 on:
   push:
     branches: [main]
     paths:
-      - Dockerfile
-      - base.Dockerfile
-      - android.Dockerfile
-      - web.Dockerfile
-      - linux.Dockerfile
+      - docker/Dockerfile
+      - docker/base.Dockerfile
+      - docker/android.Dockerfile
+      - docker/web.Dockerfile
+      - docker/linux.Dockerfile
       - FLUTTER_VERSION
   workflow_dispatch: {}
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   build-combo:
+    permissions:
+      contents: write
+      packages: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Read pinned Flutter version
         id: pinned
         run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/build-push-action@v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5.6.1
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/flutter
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.pinned.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.pinned.outputs.version }}
+            type=semver,pattern={{major}},value=${{ steps.pinned.outputs.version }}
+            type=raw,value=latest
+            type=raw,value=pinned
+            type=raw,value=stable
+          labels: |
+            org.opencontainers.image.description=Flutter Docker image for CI/CD (Combo)
+            org.opencontainers.image.licenses=MIT
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
+          file: docker/Dockerfile
           push: true
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
-          labels: |
-            org.opencontainers.image.version=${{ steps.pinned.outputs.version }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/flutter:${{ steps.pinned.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/flutter:pinned
-            ghcr.io/${{ github.repository_owner }}/flutter:stable
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           # Shares the same GitHub Actions cache pr-check.yml already
           # warms on every PR — the base OS/Android/Chrome layers (slow,
           # network-heavy) are reused here instead of rebuilt from
@@ -72,24 +86,27 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-platforms:
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
         platform: [android, web, linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Read pinned Flutter version
         id: pinned
         run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # driver: docker (not the default docker-container) on purpose —
-      # base.Dockerfile is built locally here and then referenced by
+      # docker/base.Dockerfile is built locally here and then referenced by
       # android/web/linux.Dockerfile's `FROM ${BASE_IMAGE}`. The
       # docker-container driver runs BuildKit in its own isolated
       # container with its own separate image store, so a locally
@@ -103,30 +120,41 @@ jobs:
       # cost of no `type=gha` remote cache export, which that driver
       # doesn't support; ordinary Docker layer caching still applies
       # within this same job's steps.
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: docker
 
       - name: Build shared base layer
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
-          file: base.Dockerfile
+          file: docker/base.Dockerfile
           load: true
           tags: flutter-base:build
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
 
-      - uses: docker/build-push-action@v7
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5.6.1
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.pinned.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.pinned.outputs.version }}
+            type=semver,pattern={{major}},value=${{ steps.pinned.outputs.version }}
+            type=raw,value=latest
+            type=raw,value=pinned
+            type=raw,value=stable
+          labels: |
+            org.opencontainers.image.description=Flutter Docker image for CI/CD (${{ matrix.platform }})
+            org.opencontainers.image.licenses=MIT
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
-          file: ${{ matrix.platform }}.Dockerfile
+          file: docker/${{ matrix.platform }}.Dockerfile
           push: true
           build-args: |
             BASE_IMAGE=flutter-base:build
-          labels: |
-            org.opencontainers.image.version=${{ steps.pinned.outputs.version }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:${{ steps.pinned.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:pinned
-            ghcr.io/${{ github.repository_owner }}/flutter-${{ matrix.platform }}:stable
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
