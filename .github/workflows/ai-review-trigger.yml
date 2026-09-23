@@ -1,0 +1,28 @@
+name: AI Review Trigger
+
+# Automatically triggers AI reviewers (CodeRabbit) on pull requests.
+# Solves the "fewer than 10 stars" restriction by automatically invoking
+# the review command using the configured GH_PAT_WORKFLOW identity.
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  trigger-coderabbit:
+    # Skip for automated bots to conserve review quota and prevent loops
+    if: "!contains(fromJSON('[\"dependabot[bot]\", \"app/dependabot\", \"github-actions[bot]\", \"app/github-actions\"]'), github.actor)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger CodeRabbit Review
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -e
+          echo "Triggering CodeRabbit review for PR $PR_URL..."
+          gh pr comment "$PR_URL" --body "@coderabbitai review"

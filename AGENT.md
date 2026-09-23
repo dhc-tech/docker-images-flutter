@@ -10,10 +10,12 @@ This repository provides automated, multi-platform Docker images for Flutter CI/
 2. **Security First:** All dependencies (Base images, GitHub Actions) MUST be pinned to SHA-256 hashes. Do not use floating tags like `@v2` or `:latest` in internal workflow configurations.
 3. **Immutability:** Docker tags like `3.24.2` and `pinned` are immutable. Only `stable` and `latest` move.
 4. **Test Before Push:** Always ensure `pre-commit` hooks pass locally. We use Hadolint for Dockerfiles and Yamllint for Workflows.
+5. **PR Review & Auto-merge:** Main branch has strict branch protection (1 approving review required). Bot PRs auto-approve via `GH_PAT_WORKFLOW`. For human PRs, contributors can request auto-merge via the `automerge` label.
 
 ## Architecture
 - `docker/`: Contains all Dockerfiles. The `Dockerfile` is the combo image. `base.Dockerfile` is the shared layer for the platform-specific images (`android`, `web`, `linux`).
 - `FLUTTER_VERSION`: The single source of truth for the currently built Flutter version.
-- `.github/workflows/`: Contains the CI/CD pipeline. `check-flutter-version.yml` updates the version, `auto-merge.yml` merges it, and `build-and-push.yml` builds and pushes the images.
+- `.github/workflows/`: Contains the CI/CD pipeline. `check-flutter-version.yml` updates the version, `auto-merge.yml` handles approvals and automerge, and `build-and-push.yml` builds, signs (SLSA), and pushes the images.
 
 Refer to the `.agent/` directory for specific rules, skills, and sub-agent instructions.
+

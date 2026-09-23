@@ -1,15 +1,38 @@
 docker:
   - any:
-      - 'docker/*.Dockerfile'
-      - 'docker/Dockerfile'
+      - 'docker/**'
+      - '.dockerignore'
 
 github-actions:
   - any:
-      - '.github/workflows/*'
+      - '.github/workflows/**'
+
+dependencies:
+  - any:
       - '.github/dependabot.yml'
+      - 'FLUTTER_VERSION'
 
 documentation:
   - any:
-      - 'README.md'
-      - 'SECURITY.md'
+      - '*.md'
+      - 'docs/**'
       - 'LICENSE'
+
+testing:
+  - any:
+      - 'tests/**'
+
+devops:
+  - any:
+      - '.agent/**'
+      - '.cursorrules'
+      - '.pre-commit-config.yaml'
+      - '.yamllint'
+      - 'Makefile'
+      - '.github/labeler.yml'
+      - '.github/CODEOWNERS'
+
+security:
+  - any:
+      - 'SECURITY.md'
+      - '.github/workflows/scorecard.yml'

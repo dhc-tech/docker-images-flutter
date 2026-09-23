@@ -63,7 +63,9 @@ jobs:
           trusted="$(echo "$prs" | jq -c '[.[] | select(
             (.author.login == "dependabot[bot]") or
             (.author.login == "app/dependabot") or
-            ([.labels[].name] | contains(["automated-flutter-bump"]))
+            ((.headRefName | startswith("flutter-bump/")) and
+             ((.author.login == "github-actions[bot]") or (.author.login == "app/github-actions")) and
+             ([.labels[].name] | contains(["automated-flutter-bump"])))
           )]')"
           echo "prs=$trusted" >> "$GITHUB_OUTPUT"
           echo "Trusted open PRs: $(echo "$trusted" | jq -r '[.[].number] | join(", ")')"
@@ -85,13 +87,8 @@ jobs:
             run_id="$(echo "$run" | jq -r '.id')"
             head_branch="$(echo "$run" | jq -r '.head_branch')"
 
-            # flutter-bump/* is trusted by naming convention alone (the
-            # check-flutter-version.yml bot's own branches): its PR may not
-            # be queryable yet at the exact moment the run needs approval.
-            case "$head_branch" in
-              flutter-bump/*) trusted=true ;;
-              *) trusted="$(echo "$trusted_branches" | grep -qxF "$head_branch" && echo true || echo false)" ;;
-            esac
+            # Only approve runs that belong to an open, verified bot PR from TRUSTED_PRS
+            trusted="$(echo "$trusted_branches" | grep -qxF "$head_branch" && echo true || echo false)"
 
             if [ "$trusted" != "true" ]; then
               echo "Run $run_id on '$head_branch' is not a trusted bot branch — leaving it for manual review."

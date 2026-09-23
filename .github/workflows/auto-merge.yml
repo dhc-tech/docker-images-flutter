@@ -1,24 +1,14 @@
-name: Auto-merge bot PRs
+name: Auto-merge PRs
 
-# Restricted to PRs opened by a bot this repo actually trusts:
-# check-flutter-version.yml's own bump bot, or GitHub's native Dependabot
-# (.github/dependabot.yml) — never a human-authored PR, even one that
-# happens to touch the same files. Actual merge only happens once
-# pr-check.yml's build passes; GitHub's native auto-merge handles that
-# wait.
-#
-# pull_request_target, not pull_request: Dependabot-authored PRs always
-# get a hard-restricted, read-only GITHUB_TOKEN on `pull_request` (a
-# GitHub security policy, not something repo settings can override) — the
-# `gh pr merge --auto` step below would silently fail for every Dependabot
-# PR under that trigger. pull_request_target runs with the base branch's
-# real permissions regardless of PR source — GitHub's own documented
-# mechanism for automating Dependabot — and is safe here specifically
-# because this workflow only reads PR metadata and calls `gh pr merge`,
-# never checks out or executes anything from the PR branch itself.
+# Supports two safe auto-merge workflows:
+# 1. Trusted bot PRs (Flutter version bumps & Dependabot):
+#    Automatically approved via GH_PAT_WORKFLOW and queued for auto-merge.
+# 2. Human PRs with 'automerge' label added by a contributor/maintainer:
+#    Queued for auto-merge (still strictly requires 1 human approval and all CI checks green).
+
 on:
   pull_request_target:
-    types: [opened, labeled, reopened]
+    types: [opened, labeled, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -30,32 +20,79 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      # Fetches the PR's current label/author fresh via the API rather
-      # than trusting github.event.pull_request.labels — when a PR is
-      # opened with `gh pr create --label ...` in one call, the `opened`
-      # event's webhook payload isn't reliably populated with that label
-      # yet (a real timing quirk, confirmed by an actual bot-opened PR
-      # whose `opened` event had an empty labels list despite --label
-      # having been passed at creation).
       - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
+          HAS_PAT: ${{ secrets.GH_PAT_WORKFLOW != '' }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          SENDER_LOGIN: ${{ github.event.sender.login }}
+          SENDER_ASSOCIATION: ${{ github.event.sender.author_association }}
         run: |
           set -e
-          info="$(gh pr view "$PR_URL" --json labels,author)"
+          info="$(gh pr view "$PR_URL" --json labels,author,headRefName)"
           has_bump_label="$(echo "$info" | jq -r '[.labels[].name] | contains(["automated-flutter-bump"])')"
+          has_automerge_label="$(echo "$info" | jq -r '[.labels[].name] | (contains(["automerge"]) or contains(["auto-merge"]))')"
           author="$(echo "$info" | jq -r '.author.login')"
-          # gh CLI's JSON author.login for a GitHub App actor has been seen
-          # as both "dependabot[bot]" (classic REST-style) and
-          # "app/dependabot" (newer App-node style) depending on version —
-          # match either rather than assume one, since guessing wrong here
-          # means Dependabot PRs silently never auto-merge.
+          head_ref="$(echo "$info" | jq -r '.headRefName')"
+
           case "$author" in
             dependabot\[bot\]|app/dependabot) is_dependabot=true ;;
             *) is_dependabot=false ;;
           esac
-          if [ "$has_bump_label" != "true" ] && [ "$is_dependabot" != "true" ]; then
-            echo "PR is not the Flutter version-bump bot and not Dependabot ($author) — not auto-merging."
+
+          # Strict verification: automated-flutter-bump is only trusted if authored by
+          # the GitHub Actions bot and originating from a flutter-bump/* branch
+          is_trusted_bump=false
+          if [ "$has_bump_label" = "true" ]; then
+            case "$head_ref" in
+              flutter-bump/*)
+                case "$author" in
+                  github-actions\[bot\]|app/github-actions)
+                    is_trusted_bump=true
+                    ;;
+                esac
+                ;;
+            esac
+          fi
+
+          # Case 1: Trusted automated bot PRs (genuine version bump or Dependabot)
+          if [ "$is_trusted_bump" = "true" ] || [ "$is_dependabot" = "true" ]; then
+            echo "Processing automated bot PR by $author (branch: $head_ref)..."
+
+            # Approve the PR using dedicated PAT if available
+            if [ "$HAS_PAT" = "true" ]; then
+              echo "Approving PR using configured GH_PAT_WORKFLOW..."
+              gh pr review --approve "$PR_URL"
+            elif [ "$is_dependabot" = "true" ]; then
+              echo "Approving Dependabot PR using GITHUB_TOKEN..."
+              gh pr review --approve "$PR_URL"
+            else
+              echo "::error::GH_PAT_WORKFLOW is required to auto-approve flutter-bump PRs under strict branch protection."
+              exit 1
+            fi
+
+            echo "Enabling auto-merge for bot PR..."
+            gh pr merge --auto --squash "$PR_URL"
             exit 0
           fi
-          gh pr merge --auto --squash "$PR_URL"
+
+          # Case 2: Human PR with 'automerge' label
+          if [ "$has_automerge_label" = "true" ]; then
+            echo "Checking permissions for automerge label trigger by $SENDER_LOGIN ($SENDER_ASSOCIATION)..."
+
+            is_authorized=false
+            can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${SENDER_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
+            if [ "$can_push_or_admin" = "true" ]; then
+              is_authorized=true
+            fi
+
+            if [ "$is_authorized" = "true" ]; then
+              echo "Authorized contributor $SENDER_LOGIN requested auto-merge via label. Enabling auto-merge (requires human approval & passing CI)..."
+              gh pr merge --auto --squash "$PR_URL"
+              exit 0
+            else
+              echo "::error::User $SENDER_LOGIN does not have contributor/write permissions to enable auto-merge."
+              exit 1
+            fi
+          fi
+
+          echo "PR does not qualify for auto-merge (not a trusted bot and lacks authorized automerge label)."
