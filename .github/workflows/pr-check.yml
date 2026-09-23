@@ -73,6 +73,8 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          load: true
+          tags: flutter:build
           push: false
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
