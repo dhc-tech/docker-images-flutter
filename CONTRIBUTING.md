@@ -41,4 +41,14 @@ pre-commit run --all-files
 2. Make your changes and ensure `pre-commit` checks pass.
 3. Push to your branch and open a Pull Request.
 4. Fill out the provided Pull Request template completely.
-5. Wait for the automated CI quality gates to pass.
+5. Wait for the automated CI quality gates to pass (Docker tests, CodeQL, Hadolint, Yamllint).
+
+### Approvals & Auto-merge
+
+- **Strict Branch Protection**: All PRs targeting `main` strictly require at least **1 approving review** from a maintainer/collaborator before they can be merged.
+- **`automerge` Label**: If you are a contributor or maintainer with write access, you can add the `automerge` label to a PR. 
+  - Once labeled, GitHub Actions queues the PR for automated squash-and-merge.
+  - The PR will only merge once:
+    1. At least 1 approving human review has been submitted.
+    2. All 11 CI/CD status checks are 100% green.
+

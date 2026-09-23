@@ -12,4 +12,11 @@ If you are Claude, Cursor, or another AI coding assistant, follow these rules wh
 When asked to modify the CI/CD pipeline, always check:
 - `build-and-push.yml` for publishing.
 - `pr-check.yml` for local branch testing.
+- `auto-merge.yml` for bot approval and contributor `automerge` label handling.
 - `.dockerignore` to ensure the context remains small.
+
+## Pull Requests & Auto-merge Rules
+- Human PRs strictly require 1 approving human review; never attempt to bypass.
+- Contributor auto-merge can be requested by applying the `automerge` label.
+- Bot PRs (Flutter bumps, Dependabot) auto-approve using `GH_PAT_WORKFLOW`.
+
