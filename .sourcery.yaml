@@ -1,0 +1,8 @@
+# Sourcery configuration
+# https://docs.sourcery.ai/Configuration/
+
+# Use "quiet" profile so only genuine bugs block PRs (not nitpicks)
+review:
+  profile: quiet
+
+rules: []
