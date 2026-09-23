@@ -63,7 +63,9 @@ jobs:
           trusted="$(echo "$prs" | jq -c '[.[] | select(
             (.author.login == "dependabot[bot]") or
             (.author.login == "app/dependabot") or
-            ([.labels[].name] | contains(["automated-flutter-bump"]))
+            ((.headRefName | startswith("flutter-bump/")) and
+             ((.author.login == "github-actions[bot]") or (.author.login == "app/github-actions")) and
+             ([.labels[].name] | contains(["automated-flutter-bump"])))
           )]')"
           echo "prs=$trusted" >> "$GITHUB_OUTPUT"
           echo "Trusted open PRs: $(echo "$trusted" | jq -r '[.[].number] | join(", ")')"

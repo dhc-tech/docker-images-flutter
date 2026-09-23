@@ -80,18 +80,9 @@ jobs:
             echo "Checking permissions for automerge label trigger by $SENDER_LOGIN ($SENDER_ASSOCIATION)..."
 
             is_authorized=false
-            case "$SENDER_ASSOCIATION" in
-              OWNER|MEMBER|COLLABORATOR)
-                is_authorized=true
-                ;;
-            esac
-
-            # Fallback API check for write permissions
-            if [ "$is_authorized" != "true" ]; then
-              can_push="$(gh api "repos/${{ github.repository }}/collaborators/${SENDER_LOGIN}/permission" --jq '.permissions.push // false' 2>/dev/null || echo "false")"
-              if [ "$can_push" = "true" ]; then
-                is_authorized=true
-              fi
+            can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${SENDER_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
+            if [ "$can_push_or_admin" = "true" ]; then
+              is_authorized=true
             fi
 
             if [ "$is_authorized" = "true" ]; then
