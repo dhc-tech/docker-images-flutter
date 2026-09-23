@@ -28,19 +28,35 @@ jobs:
           SENDER_ASSOCIATION: ${{ github.event.sender.author_association }}
         run: |
           set -e
-          info="$(gh pr view "$PR_URL" --json labels,author)"
+          info="$(gh pr view "$PR_URL" --json labels,author,headRefName)"
           has_bump_label="$(echo "$info" | jq -r '[.labels[].name] | contains(["automated-flutter-bump"])')"
           has_automerge_label="$(echo "$info" | jq -r '[.labels[].name] | (contains(["automerge"]) or contains(["auto-merge"]))')"
           author="$(echo "$info" | jq -r '.author.login')"
+          head_ref="$(echo "$info" | jq -r '.headRefName')"
 
           case "$author" in
             dependabot\[bot\]|app/dependabot) is_dependabot=true ;;
             *) is_dependabot=false ;;
           esac
 
-          # Case 1: Trusted automated bot PRs (version bump or Dependabot)
-          if [ "$has_bump_label" = "true" ] || [ "$is_dependabot" = "true" ]; then
-            echo "Processing automated bot PR by $author..."
+          # Strict verification: automated-flutter-bump is only trusted if authored by
+          # the GitHub Actions bot and originating from a flutter-bump/* branch
+          is_trusted_bump=false
+          if [ "$has_bump_label" = "true" ]; then
+            case "$head_ref" in
+              flutter-bump/*)
+                case "$author" in
+                  github-actions\[bot\]|app/github-actions)
+                    is_trusted_bump=true
+                    ;;
+                esac
+                ;;
+            esac
+          fi
+
+          # Case 1: Trusted automated bot PRs (genuine version bump or Dependabot)
+          if [ "$is_trusted_bump" = "true" ] || [ "$is_dependabot" = "true" ]; then
+            echo "Processing automated bot PR by $author (branch: $head_ref)..."
 
             # Approve the PR using dedicated PAT if available
             if [ "$HAS_PAT" = "true" ]; then
