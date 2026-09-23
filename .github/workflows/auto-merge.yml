@@ -25,8 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - env:
-          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
-          HAS_PAT: ${{ secrets.GH_PAT_WORKFLOW != '' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BOT_PAT: ${{ secrets.GH_PAT_WORKFLOW }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           ACTOR_LOGIN: ${{ github.event.review.user.login || github.event.sender.login }}
         run: |
@@ -63,9 +63,9 @@ jobs:
             echo "Processing automated bot PR by $author (branch: $head_ref)..."
 
             # Approve the PR using dedicated PAT if available
-            if [ "$HAS_PAT" = "true" ]; then
-              echo "Approving PR using configured GH_PAT_WORKFLOW..."
-              gh pr review --approve "$PR_URL"
+            if [ -n "$BOT_PAT" ]; then
+              echo "Approving PR using configured BOT_PAT..."
+              GH_TOKEN="$BOT_PAT" gh pr review --approve "$PR_URL"
             elif [ "$is_dependabot" = "true" ]; then
               echo "Approving Dependabot PR using GITHUB_TOKEN..."
               gh pr review --approve "$PR_URL"
