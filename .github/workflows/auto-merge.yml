@@ -1,115 +1,254 @@
 name: Auto-merge PRs
 
-# Supports two safe auto-merge workflows:
-# 1. Trusted bot PRs (Flutter version bumps & Dependabot):
-#    Automatically approved via GH_PAT_WORKFLOW and queued for auto-merge.
+# Two safe auto-merge flows:
+# 1. Bot PRs (Dependabot / Flutter version bumps):
+#    Auto-approved via BOT_PAT. Waits for all CI checks to go GREEN,
+#    then squash-merges via github-actions[bot].
 # 2. Human PRs:
-#    - Automatically applies 'needs-approval' label when opened or updated.
-#    - When approved by a maintainer/collaborator, automatically removes 'needs-approval',
-#      adds 'automerge', and queues the PR for squash auto-merge once CI checks pass.
+#    - On open/update: 'needs-approval' label added.
+#    - After maintainer approval but checks still pending: 'waiting-for-green'.
+#    - All checks GREEN + approved: 'waiting-for-green' replaced by 'automerge',
+#      then PR is squash-merged by github-actions[bot].
+#    - If any check fails: 'ci-failed' label added, merge blocked.
 
 on:
   pull_request_target:
-    types: [opened, labeled, reopened, ready_for_review, synchronize]
+    types: [opened, labeled, unlabeled, reopened, ready_for_review, synchronize]
   pull_request_review:
     types: [submitted, dismissed]
+  check_suite:
+    types: [completed]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
-  enable-auto-merge:
+  # For check_suite events: one job per associated PR (matrix).
+  # For pull_request / pull_request_review: single job for that PR.
+  resolve-prs:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_numbers: ${{ steps.resolve.outputs.pr_numbers }}
+    steps:
+      - id: resolve
+        env:
+          PR_FROM_EVENT: ${{ github.event.pull_request.number }}
+          # check_suite exposes all associated PRs
+          SUITE_PRS: ${{ toJSON(github.event.check_suite.pull_requests.*.number) }}
+        run: |
+          if [ -n "$PR_FROM_EVENT" ]; then
+            echo "pr_numbers=[${PR_FROM_EVENT}]" >> "$GITHUB_OUTPUT"
+          elif [ "$SUITE_PRS" != "null" ] && [ "$SUITE_PRS" != "[]" ]; then
+            echo "pr_numbers=${SUITE_PRS}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_numbers=[]" >> "$GITHUB_OUTPUT"
+          fi
+
+  manage-merge:
+    needs: resolve-prs
+    if: needs.resolve-prs.outputs.pr_numbers != '[]'
     permissions:
       contents: write
       pull-requests: write
     runs-on: ubuntu-latest
+    # Serialize runs per PR — prevents stale label decisions from racing
+    concurrency:
+      group: auto-merge-pr-${{ matrix.pr_number }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        pr_number: ${{ fromJSON(needs.resolve-prs.outputs.pr_numbers) }}
     steps:
-      - env:
+      - name: Process PR merge lifecycle
+        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOT_PAT: ${{ secrets.GH_PAT_WORKFLOW }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          ACTOR_LOGIN: ${{ github.event.review.user.login || github.event.sender.login }}
+          PR_NUMBER: ${{ matrix.pr_number }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_TYPE: ${{ github.event.action }}
         run: |
           set -e
-          info="$(gh pr view "$PR_URL" --json labels,author,headRefName,reviewDecision)"
-          has_bump_label="$(echo "$info" | jq -r '[.labels[].name] | contains(["automated-flutter-bump"])')"
-          has_automerge_label="$(echo "$info" | jq -r '[.labels[].name] | (contains(["automerge"]) or contains(["auto-merge"]))')"
+
+          PR_URL="https://github.com/${REPO}/pull/${PR_NUMBER}"
+          echo "Inspecting PR: $PR_URL"
+
+          info="$(gh pr view "$PR_URL" --json state,labels,author,headRefName,reviewDecision,statusCheckRollup)"
+          pr_state="$(echo "$info" | jq -r '.state')"
+
+          if [ "$pr_state" != "OPEN" ]; then
+            echo "PR is not open (state: $pr_state). Exiting."
+            exit 0
+          fi
+
           author="$(echo "$info" | jq -r '.author.login')"
           head_ref="$(echo "$info" | jq -r '.headRefName')"
-          review_decision="$(echo "$info" | jq -r '.reviewDecision')"
 
+          # ─── DISMISS STALE REVIEWS ON NEW PUSH (via github-actions[bot]) ──────
+          # GitHub's built-in dismiss_stale_reviews attributes dismissal to the
+          # commit pusher (@dhc-tech). Instead, we dismiss via GITHUB_TOKEN here
+          # so the dismissal shows as github-actions[bot].
+          if [ "$EVENT_NAME" = "pull_request_target" ] && [ "$EVENT_TYPE" = "synchronize" ]; then
+            echo "New commit pushed — dismissing stale APPROVED reviews via github-actions[bot]..."
+            approved_review_ids="$(gh api \
+              "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+              --jq '[.[] | select(.state == "APPROVED")] | .[].id')"
+            if [ -n "$approved_review_ids" ]; then
+              for review_id in $approved_review_ids; do
+                echo "Dismissing review $review_id..."
+                gh api -X PUT \
+                  "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${review_id}/dismissals" \
+                  -f message="New commit pushed — re-approval required." \
+                  2>/dev/null || true
+              done
+            else
+              echo "No approved reviews to dismiss."
+            fi
+          fi
+
+          # Helper functions — fail loudly so merge is not silently skipped
+          remove_label() {
+            local label="$1"
+            gh pr edit "$PR_URL" --remove-label "$label" 2>/dev/null || true
+          }
+          add_label() {
+            local label="$1"
+            if ! gh pr edit "$PR_URL" --add-label "$label"; then
+              echo "::error::Failed to add label '$label' to PR $PR_NUMBER." >&2
+              exit 1
+            fi
+          }
+
+          # ─── CI CHECK STATUS ─────────────────────────────────────────────────
+          # Re-fetch fresh state just before acting to avoid stale decisions
+          info="$(gh pr view "$PR_URL" --json state,labels,author,headRefName,reviewDecision,statusCheckRollup)"
+
+          checks_summary="$(echo "$info" | jq '
+            [.statusCheckRollup[] |
+              select((.workflowName // "") != "Auto-merge PRs" and
+                     (.name // .context) != "manage-merge" and
+                     (.name // .context) != "resolve-prs")] |
+            {
+              total: length,
+              pending: [.[] | select(
+                # CheckRun still running
+                ((.status != null) and (.status != "COMPLETED")) or
+                # StatusContext pending or expected
+                ((.state != null) and (.state == "PENDING" or .state == "EXPECTED"))
+              )] | length,
+              failing: [.[] | select(
+                # CheckRun with a bad conclusion
+                ((.conclusion != null) and
+                 ([ .conclusion ] | inside(["SUCCESS","NEUTRAL","SKIPPED"]) | not)) or
+                # StatusContext explicitly failed
+                ((.state != null) and (.state == "FAILURE" or .state == "ERROR"))
+              )] | length
+            }')"
+
+          pending_checks="$(echo "$checks_summary" | jq -r '.pending')"
+          failing_checks="$(echo "$checks_summary" | jq -r '.failing')"
+          total_checks="$(echo "$checks_summary" | jq -r '.total')"
+          echo "CI → total=$total_checks  pending=$pending_checks  failing=$failing_checks"
+
+          # ─── CASE 1: BOT PR (Dependabot or trusted Flutter bump) ─────────────
+          is_dependabot=false
+          is_trusted_bump=false
           case "$author" in
-            dependabot\[bot\]|app/dependabot) is_dependabot=true ;;
-            *) is_dependabot=false ;;
+            "dependabot[bot]"|"app/dependabot") is_dependabot=true ;;
           esac
 
-          # Strict verification: automated-flutter-bump is only trusted if authored by
-          # the GitHub Actions bot and originating from a flutter-bump/* branch
-          is_trusted_bump=false
+          has_bump_label="$(echo "$info" | jq -r '[.labels[].name] | contains(["automated-flutter-bump"])')"
           if [ "$has_bump_label" = "true" ]; then
             case "$head_ref" in
               flutter-bump/*)
                 case "$author" in
-                  github-actions\[bot\]|app/github-actions)
-                    is_trusted_bump=true
-                    ;;
-                esac
-                ;;
+                  "github-actions[bot]"|"app/github-actions") is_trusted_bump=true ;;
+                esac ;;
             esac
           fi
 
-          # Case 1: Trusted automated bot PRs (genuine version bump or Dependabot)
-          if [ "$is_trusted_bump" = "true" ] || [ "$is_dependabot" = "true" ]; then
-            echo "Processing automated bot PR by $author (branch: $head_ref)..."
+          if [ "$is_dependabot" = "true" ] || [ "$is_trusted_bump" = "true" ]; then
+            echo "Bot PR detected (author: $author, branch: $head_ref)."
 
-            # Approve the PR using dedicated PAT if available
-            if [ -n "$BOT_PAT" ]; then
-              echo "Approving PR using configured BOT_PAT..."
-              GH_TOKEN="$BOT_PAT" gh pr review --approve "$PR_URL"
-            elif [ "$is_dependabot" = "true" ]; then
-              echo "Approving Dependabot PR using GITHUB_TOKEN..."
-              gh pr review --approve "$PR_URL"
-            else
-              echo "::error::GH_PAT_WORKFLOW is required to auto-approve flutter-bump PRs under strict branch protection."
-              exit 1
-            fi
+            review_decision="$(echo "$info" | jq -r '.reviewDecision')"
 
-            echo "Enabling auto-merge for bot PR..."
-            gh pr merge --auto --squash "$PR_URL"
-            exit 0
-          fi
-
-          # Case 2: Human PR approval handling
-          if [ "$review_decision" = "APPROVED" ]; then
-            echo "PR has been approved! Removing 'needs-approval' label and enabling auto-merge..."
-            gh pr edit "$PR_URL" --remove-label "needs-approval" || true
-            gh pr edit "$PR_URL" --add-label "automerge" || true
-            gh pr merge --auto --squash "$PR_URL" || true
-            exit 0
-          else
-            echo "PR is not yet approved (reviewDecision: $review_decision). Ensuring 'needs-approval' label is set..."
-            gh pr edit "$PR_URL" --add-label "needs-approval" || true
-          fi
-
-          # Case 3: Explicit 'automerge' label added by authorized collaborator
-          if [ "$has_automerge_label" = "true" ]; then
-            echo "Checking permissions for automerge trigger by $ACTOR_LOGIN..."
-            is_authorized=false
-            if [ "$ACTOR_LOGIN" = "${{ github.repository_owner }}" ]; then
-              is_authorized=true
-            else
-              can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
-              if [ "$can_push_or_admin" = "true" ]; then
-                is_authorized=true
+            # Only approve if not already approved — avoids re-approval → event → loop
+            if [ "$review_decision" != "APPROVED" ]; then
+              if [ -z "$BOT_PAT" ]; then
+                echo "::error::GH_PAT_WORKFLOW secret is unset. Cannot approve bot PR." >&2
+                exit 1
               fi
+              echo "Approving bot PR via BOT_PAT..."
+              if ! GH_TOKEN="$BOT_PAT" gh pr review --approve "$PR_URL"; then
+                echo "::error::Failed to approve bot PR via BOT_PAT." >&2
+                exit 1
+              fi
+            else
+              echo "Bot PR already approved. Skipping re-approval."
             fi
 
-            if [ "$is_authorized" = "true" ]; then
-              echo "Authorized contributor $ACTOR_LOGIN enabled auto-merge. Queuing PR..."
-              gh pr merge --auto --squash "$PR_URL"
+            if [ "$failing_checks" -gt 0 ]; then
+              echo "CI has failures ($failing_checks). Marking as ci-failed."
+              remove_label "waiting-for-green"
+              remove_label "automerge"
+              add_label "ci-failed"
               exit 0
-            else
-              echo "::error::User $ACTOR_LOGIN does not have contributor/write permissions to enable auto-merge."
-              exit 1
             fi
+
+            if [ "$total_checks" -eq 0 ] || [ "$pending_checks" -gt 0 ]; then
+              echo "Checks still running ($pending_checks pending). Adding 'waiting-for-green'."
+              remove_label "automerge"
+              remove_label "ci-failed"
+              add_label "waiting-for-green"
+              gh pr merge --auto --squash "$PR_URL" 2>/dev/null || true
+              exit 0
+            fi
+
+            echo "All $total_checks checks GREEN. Bot PR ready to merge."
+            remove_label "waiting-for-green"
+            remove_label "ci-failed"
+            add_label "automerge"
+            gh pr merge --auto --squash "$PR_URL"
+            echo "Done — bot PR queued for auto-squash-merge by github-actions[bot]."
+            exit 0
           fi
+
+          # ─── CASE 2: HUMAN PR ─────────────────────────────────────────────────
+          review_decision="$(echo "$info" | jq -r '.reviewDecision')"
+
+          if [ "$review_decision" != "APPROVED" ]; then
+            echo "Not approved (reviewDecision: $review_decision). Setting 'needs-approval'."
+            remove_label "waiting-for-green"
+            remove_label "automerge"
+            add_label "needs-approval"
+            exit 0
+          fi
+
+          echo "PR is APPROVED by maintainer."
+          remove_label "needs-approval"
+
+          if [ "$failing_checks" -gt 0 ]; then
+            echo "CI has failures ($failing_checks). Marking as ci-failed."
+            remove_label "waiting-for-green"
+            remove_label "automerge"
+            add_label "ci-failed"
+            exit 0
+          fi
+
+          if [ "$total_checks" -eq 0 ] || [ "$pending_checks" -gt 0 ]; then
+            echo "Checks still running ($pending_checks pending). Setting 'waiting-for-green'."
+            remove_label "automerge"
+            remove_label "ci-failed"
+            add_label "waiting-for-green"
+            exit 0
+          fi
+
+          # All checks GREEN + approved → squash merge!
+          echo "All $total_checks checks GREEN and review APPROVED. Merging!"
+          remove_label "waiting-for-green"
+          remove_label "ci-failed"
+          add_label "automerge"
+          gh pr merge --auto --squash "$PR_URL"
+          echo "Auto-merge enabled by github-actions[bot]."
