@@ -17,6 +17,8 @@ When asked to modify the CI/CD pipeline, always check:
 
 ## Pull Requests & Auto-merge Rules
 - Human PRs strictly require 1 approving human review; never attempt to bypass.
-- Contributor auto-merge can be requested by applying the `automerge` label.
+- When opened or updated, PRs automatically receive the `needs-approval` label.
+- When approved by a maintainer/collaborator, `needs-approval` is automatically removed and `automerge` is queued.
 - Bot PRs (Flutter bumps, Dependabot) auto-approve using `GH_PAT_WORKFLOW`.
+- AI code reviews are automatically triggered for CodeRabbit and Sourcery.
 

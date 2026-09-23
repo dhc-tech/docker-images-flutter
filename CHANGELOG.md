@@ -8,17 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Enterprise-grade AI Assistant contexts (`CLAUDE.md`, `AGENT.md`, `.cursorrules`).
-- `container-structure-test` configuration for robust image verification.
-- Pre-commit hooks (`hadolint`, `yamllint`).
-- Comprehensive `.gitignore`, `CODE_OF_CONDUCT.md`, and `Makefile`.
-- Centralized `docker/` directory for all Dockerfiles.
-
-### Changed
-- Refactored GitHub Actions to use strictly-pinned SHA-256 actions and dependencies.
-- Updated Dockerfiles to use strict bash `pipefail` with proper SIGPIPE handling.
-- Automated tagging now strictly uses OCI annotations via `docker/metadata-action`.
+- Automated `needs-approval` and `automerge` label lifecycle via GitHub Actions.
+- Automated AI code review integration (CodeRabbit & Sourcery).
+- Aesthetic badge suite to `README.md` (CI Build, Hadolint, Yamllint, Release, License).
 
 ### Security
-- Integrated OpenSSF Scorecard.
-- Fixed root permissions across all internal CI/CD steps.
+- Pinned `ARG BASE_IMAGE` in all platform Dockerfiles (`android`, `linux`, `web`) to immutable `@sha256` digests, achieving 100% container image pinning for OpenSSF Scorecard.
+- Hardened branch protection rules with required last-push approval, linear history enforcement, and conversation resolution.
+
+## [3.47.5] - 2026-09-23
+
+### Added
+- Official enterprise-grade Docker release for Flutter 3.47.5 (`flutter`, `flutter-android`, `flutter-web`, `flutter-linux`).
+- SLSA Level 3 provenance attestations (`*.intoto.jsonl`) and Sigstore bundles attached to release assets.
+- OpenSSF Scorecard supply-chain audit workflow with elevated security score.
+

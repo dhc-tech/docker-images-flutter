@@ -5,7 +5,7 @@
 # BASE_IMAGE: the locally-built base.Dockerfile image tag — see
 # build-and-push.yml, which builds base.Dockerfile first and passes its
 # tag in here.
-ARG BASE_IMAGE
+ARG BASE_IMAGE=ubuntu:26.04@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
 FROM ${BASE_IMAGE}
 
 SHELL ["/bin/bash", "-eo", "pipefail", "-c"]

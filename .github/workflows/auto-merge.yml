@@ -3,12 +3,16 @@ name: Auto-merge PRs
 # Supports two safe auto-merge workflows:
 # 1. Trusted bot PRs (Flutter version bumps & Dependabot):
 #    Automatically approved via GH_PAT_WORKFLOW and queued for auto-merge.
-# 2. Human PRs with 'automerge' label added by a contributor/maintainer:
-#    Queued for auto-merge (still strictly requires 1 human approval and all CI checks green).
+# 2. Human PRs:
+#    - Automatically applies 'needs-approval' label when opened or updated.
+#    - When approved by a maintainer/collaborator, automatically removes 'needs-approval',
+#      adds 'automerge', and queues the PR for squash auto-merge once CI checks pass.
 
 on:
   pull_request_target:
-    types: [opened, labeled, reopened, ready_for_review]
+    types: [opened, labeled, reopened, ready_for_review, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
 
 permissions:
   contents: read
@@ -24,15 +28,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
           HAS_PAT: ${{ secrets.GH_PAT_WORKFLOW != '' }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-          SENDER_LOGIN: ${{ github.event.sender.login }}
-          SENDER_ASSOCIATION: ${{ github.event.sender.author_association }}
+          ACTOR_LOGIN: ${{ github.event.review.user.login || github.event.sender.login }}
         run: |
           set -e
-          info="$(gh pr view "$PR_URL" --json labels,author,headRefName)"
+          info="$(gh pr view "$PR_URL" --json labels,author,headRefName,reviewDecision)"
           has_bump_label="$(echo "$info" | jq -r '[.labels[].name] | contains(["automated-flutter-bump"])')"
           has_automerge_label="$(echo "$info" | jq -r '[.labels[].name] | (contains(["automerge"]) or contains(["auto-merge"]))')"
           author="$(echo "$info" | jq -r '.author.login')"
           head_ref="$(echo "$info" | jq -r '.headRefName')"
+          review_decision="$(echo "$info" | jq -r '.reviewDecision')"
 
           case "$author" in
             dependabot\[bot\]|app/dependabot) is_dependabot=true ;;
@@ -75,24 +79,33 @@ jobs:
             exit 0
           fi
 
-          # Case 2: Human PR with 'automerge' label
-          if [ "$has_automerge_label" = "true" ]; then
-            echo "Checking permissions for automerge label trigger by $SENDER_LOGIN ($SENDER_ASSOCIATION)..."
+          # Case 2: Human PR approval handling
+          if [ "$review_decision" = "APPROVED" ]; then
+            echo "PR has been approved! Removing 'needs-approval' label and enabling auto-merge..."
+            gh pr edit "$PR_URL" --remove-label "needs-approval" || true
+            gh pr edit "$PR_URL" --add-label "automerge" || true
+            gh pr merge --auto --squash "$PR_URL" || true
+            exit 0
+          else
+            echo "PR is not yet approved (reviewDecision: $review_decision). Ensuring 'needs-approval' label is set..."
+            gh pr edit "$PR_URL" --add-label "needs-approval" || true
+          fi
 
+          # Case 3: Explicit 'automerge' label added by authorized collaborator
+          if [ "$has_automerge_label" = "true" ]; then
+            echo "Checking permissions for automerge trigger by $ACTOR_LOGIN..."
             is_authorized=false
-            can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${SENDER_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
+            can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
             if [ "$can_push_or_admin" = "true" ]; then
               is_authorized=true
             fi
 
             if [ "$is_authorized" = "true" ]; then
-              echo "Authorized contributor $SENDER_LOGIN requested auto-merge via label. Enabling auto-merge (requires human approval & passing CI)..."
+              echo "Authorized contributor $ACTOR_LOGIN enabled auto-merge. Queuing PR..."
               gh pr merge --auto --squash "$PR_URL"
               exit 0
             else
-              echo "::error::User $SENDER_LOGIN does not have contributor/write permissions to enable auto-merge."
+              echo "::error::User $ACTOR_LOGIN does not have contributor/write permissions to enable auto-merge."
               exit 1
             fi
           fi
-
-          echo "PR does not qualify for auto-merge (not a trusted bot and lacks authorized automerge label)."

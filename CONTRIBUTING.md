@@ -43,12 +43,12 @@ pre-commit run --all-files
 4. Fill out the provided Pull Request template completely.
 5. Wait for the automated CI quality gates to pass (Docker tests, CodeQL, Hadolint, Yamllint).
 
-### Approvals & Auto-merge
-
-- **Strict Branch Protection**: All PRs targeting `main` strictly require at least **1 approving review** from a maintainer/collaborator before they can be merged.
-- **`automerge` Label**: If you are a contributor or maintainer with write access, you can add the `automerge` label to a PR. 
-  - Once labeled, GitHub Actions queues the PR for automated squash-and-merge.
-  - The PR will only merge once:
-    1. At least 1 approving human review has been submitted.
-    2. All 11 CI/CD status checks are 100% green.
-
+### Approvals & Auto-merge Lifecycle
+ 
+ - **Strict Branch Protection**: All PRs targeting `main` strictly require at least **1 approving review** from a maintainer/collaborator before they can be merged.
+ - **`needs-approval` Label**: When any PR is opened or updated, GitHub Actions automatically applies the `needs-approval` label.
+ - **Automated Approval Handling**: When an authorized maintainer or collaborator submits an approving review:
+   1. The `needs-approval` label is automatically removed.
+   2. The `automerge` label is applied and the PR is queued for auto-merge.
+   3. Once all required CI/CD status checks pass, GitHub automatically squash-merges the PR.
+ - **Manual `automerge` Label**: Authorized contributors can also directly apply the `automerge` label at any time.
