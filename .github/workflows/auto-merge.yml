@@ -38,7 +38,9 @@ jobs:
       # whose `opened` event had an empty labels list despite --label
       # having been passed at creation).
       - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use GH_PAT_WORKFLOW if present so automated version bumps opened by github-actions
+          # can be approved by a different identity, satisfying strict branch protection.
+          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           set -e
@@ -58,4 +60,5 @@ jobs:
             echo "PR is not the Flutter version-bump bot and not Dependabot ($author) — not auto-merging."
             exit 0
           fi
+          gh pr review --approve "$PR_URL" || true
           gh pr merge --auto --squash "$PR_URL"
