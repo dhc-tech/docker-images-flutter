@@ -1,6 +1,11 @@
 # docker-images-flutter
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dhc-tech/docker-images-flutter/badge)](https://scorecard.dev/viewer/?uri=github.com/dhc-tech/docker-images-flutter)
+[![CI Build](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/pr-check.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/pr-check.yml)
+[![Lint](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/lint.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/lint.yml)
+[![Yamllint](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/yamllint.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/yamllint.yml)
+[![Release](https://img.shields.io/github/v/release/dhc-tech/docker-images-flutter?color=blue&label=release)](https://github.com/dhc-tech/docker-images-flutter/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A self-owned Flutter CI Docker image — built from scratch on plain
 Ubuntu, no third-party Android/Flutter base image. Installs the Android
@@ -153,10 +158,7 @@ Already configured on this repo — noted here in case it's ever recreated:
   not permitted to create or approve pull requests."*
 - **Settings → General → Pull Requests → "Allow auto-merge"** — without
   this, `gh pr merge --auto` has nothing to enable.
-- **Branch protection on `main`**: required status checks `build-check`
-  and `build-check-platforms` (android/web/linux) — all from
-  `pr-check.yml` — strict (branch must be up to date). This is also what
-  makes `git push origin main` fail for anything but a proper PR merge.
+- **Branch protection on `main`**: required status checks `Hadolint`, `Yamllint`, and `build-check` — strict (branch must be up to date before merging), requiring 1 approving review from maintainers and linear history. Merging is automated via the `automerge` label.
 
 ## Usage
 
@@ -236,13 +238,13 @@ pipelines:
 
 ## Repo layout
 
-- `Dockerfile` — the all-in-one `flutter` image (Android + Web + Linux
+- `docker/Dockerfile` — the all-in-one `flutter` image (Android + Web + Linux
   together). `FLUTTER_REF` build arg selects the git ref (a version tag
   or a channel branch name) to install.
-- `base.Dockerfile` — shared layer (Ubuntu, Firebase CLI, the Flutter
+- `docker/base.Dockerfile` — shared layer (Ubuntu, Firebase CLI, the Flutter
   SDK itself) for the 3 split images below. Not published on its own.
-- `android.Dockerfile` / `web.Dockerfile` / `linux.Dockerfile` — each
-  builds `FROM` a locally-built `base.Dockerfile` (via the `BASE_IMAGE`
+- `docker/android.Dockerfile` / `docker/web.Dockerfile` / `docker/linux.Dockerfile` — each
+  builds `FROM` a locally-built `docker/base.Dockerfile` (via the `BASE_IMAGE`
   build-arg — see `build-and-push.yml`) plus only that platform's own
   tooling, publishing `flutter-android`/`flutter-web`/`flutter-linux`.
 - `FLUTTER_VERSION` — single source of truth for every image's `pinned`
