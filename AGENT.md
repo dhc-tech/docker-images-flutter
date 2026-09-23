@@ -10,7 +10,7 @@ This repository provides automated, multi-platform Docker images for Flutter CI/
 2. **Security First:** All dependencies (Base images, GitHub Actions) MUST be pinned to SHA-256 hashes. Do not use floating tags like `@v2` or `:latest` in internal workflow configurations.
 3. **Immutability:** Docker tags like `3.24.2` and `pinned` are immutable. Only `stable` and `latest` move.
 4. **Test Before Push:** Always ensure `pre-commit` hooks pass locally. We use Hadolint for Dockerfiles and Yamllint for Workflows.
-5. **PR Review & Auto-merge:** Main branch has strict branch protection (1 approving review required). PRs automatically receive the `needs-approval` label, which is automatically removed upon approval and queued for auto-merge. Bot PRs auto-approve via `GH_PAT_WORKFLOW`. AI reviewers (CodeRabbit & Sourcery) are automated.
+5. **PR Review & Auto-merge:** Main branch has strict branch protection (1 approving review required). PRs automatically receive `needs-approval`. Upon approval, `waiting-for-green` tracks running CI; `ci-failed` marks failures; and `automerge` is applied only when all checks pass green, triggering squash auto-merge by `github-actions[bot]`. Bot PRs auto-approve via `BOT_PAT` and wait for green.
 
 ## Architecture
 - `docker/`: Contains all Dockerfiles. The `Dockerfile` is the combo image. `base.Dockerfile` is the shared layer for the platform-specific images (`android`, `web`, `linux`).

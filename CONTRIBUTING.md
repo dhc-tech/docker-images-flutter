@@ -47,8 +47,9 @@ pre-commit run --all-files
  
  - **Strict Branch Protection**: All PRs targeting `main` strictly require at least **1 approving review** from a maintainer/collaborator before they can be merged.
  - **`needs-approval` Label**: When any PR is opened or updated, GitHub Actions automatically applies the `needs-approval` label.
- - **Automated Approval Handling**: When an authorized maintainer or collaborator submits an approving review:
-   1. The `needs-approval` label is automatically removed.
-   2. The `automerge` label is applied and the PR is queued for auto-merge.
-   3. Once all required CI/CD status checks pass, GitHub automatically squash-merges the PR.
- - **Manual `automerge` Label**: Authorized contributors can also directly apply the `automerge` label at any time.
+ - **Automated Approval & Check Lifecycle**:
+   1. When an authorized maintainer submits an approving review, `needs-approval` is automatically removed.
+   2. While CI checks are still in progress, the `waiting-for-green` label is applied.
+   3. If any CI check fails, `waiting-for-green` is removed and `ci-failed` is applied, blocking merge.
+   4. Once all CI checks are completely green and review is approved, `waiting-for-green` and `ci-failed` are removed, `automerge` is applied, and the PR is automatically queued for squash merge by `github-actions[bot]`.
+ - **Bot PRs**: Bot PRs (Dependabot, automated Flutter bumps) are auto-approved via dedicated credentials and wait for all CI checks to pass green before merging.

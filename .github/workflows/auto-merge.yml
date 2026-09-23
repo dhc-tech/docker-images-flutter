@@ -115,8 +115,19 @@ jobs:
           }
           add_label() {
             local label="$1"
+            # Ensure label exists in repository before applying to avoid failure
+            gh label create "$label" --force 2>/dev/null || true
             if ! gh pr edit "$PR_URL" --add-label "$label"; then
               echo "::error::Failed to add label '$label' to PR $PR_NUMBER." >&2
+              exit 1
+            fi
+          }
+          verify_label_applied() {
+            local label="$1"
+            local current_labels
+            current_labels="$(gh pr view "$PR_URL" --json labels --jq '[.labels[].name]')"
+            if ! echo "$current_labels" | jq -e --arg l "$label" 'contains([$l])' >/dev/null; then
+              echo "::error::Label '$label' verification failed on PR $PR_NUMBER." >&2
               exit 1
             fi
           }
@@ -202,7 +213,6 @@ jobs:
               remove_label "automerge"
               remove_label "ci-failed"
               add_label "waiting-for-green"
-              gh pr merge --auto --squash "$PR_URL" 2>/dev/null || true
               exit 0
             fi
 
@@ -210,6 +220,7 @@ jobs:
             remove_label "waiting-for-green"
             remove_label "ci-failed"
             add_label "automerge"
+            verify_label_applied "automerge"
             gh pr merge --auto --squash "$PR_URL"
             echo "Done — bot PR queued for auto-squash-merge by github-actions[bot]."
             exit 0
@@ -250,5 +261,6 @@ jobs:
           remove_label "waiting-for-green"
           remove_label "ci-failed"
           add_label "automerge"
+          verify_label_applied "automerge"
           gh pr merge --auto --squash "$PR_URL"
           echo "Auto-merge enabled by github-actions[bot]."
