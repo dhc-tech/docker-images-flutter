@@ -165,8 +165,6 @@ jobs:
           context: .
           file: docker/${{ matrix.platform }}.Dockerfile
           push: true
-          provenance: true
-          sbom: true
           build-args: |
             BASE_IMAGE=flutter-base:build
           tags: ${{ steps.meta.outputs.tags }}

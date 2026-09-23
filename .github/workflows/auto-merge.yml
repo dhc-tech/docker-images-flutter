@@ -95,9 +95,13 @@ jobs:
           if [ "$has_automerge_label" = "true" ]; then
             echo "Checking permissions for automerge trigger by $ACTOR_LOGIN..."
             is_authorized=false
-            can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
-            if [ "$can_push_or_admin" = "true" ]; then
+            if [ "$ACTOR_LOGIN" = "${{ github.repository_owner }}" ]; then
               is_authorized=true
+            else
+              can_push_or_admin="$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR_LOGIN}/permission" --jq '(.permissions.push // false) or (.permissions.admin // false)' 2>/dev/null || echo "false")"
+              if [ "$can_push_or_admin" = "true" ]; then
+                is_authorized=true
+              fi
             fi
 
             if [ "$is_authorized" = "true" ]; then
