@@ -108,7 +108,7 @@ jobs:
       pull-requests: write
     steps:
       - env:
-          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRUSTED_PRS: ${{ needs.trusted-prs.outputs.prs }}
         run: |
           set -e
