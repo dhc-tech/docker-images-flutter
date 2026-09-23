@@ -74,6 +74,8 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          provenance: true
+          sbom: true
           build-args: |
             FLUTTER_REF=${{ steps.pinned.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -84,6 +86,15 @@ jobs:
           # scratch on every version bump.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        with:
+          tag_name: ${{ steps.pinned.outputs.version }}
+          name: Flutter ${{ steps.pinned.outputs.version }}
+          body: "Automated Docker Image Release for Flutter ${{ steps.pinned.outputs.version }}\n\nDocker image: `ghcr.io/dhc-tech/docker-images-flutter:${{ steps.pinned.outputs.version }}`"
+          draft: false
+          prerelease: false
 
   build-platforms:
     permissions:
@@ -154,6 +165,8 @@ jobs:
           context: .
           file: docker/${{ matrix.platform }}.Dockerfile
           push: true
+          provenance: true
+          sbom: true
           build-args: |
             BASE_IMAGE=flutter-base:build
           tags: ${{ steps.meta.outputs.tags }}
