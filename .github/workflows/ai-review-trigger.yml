@@ -23,5 +23,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
+          set -e
           echo "Triggering CodeRabbit review for PR $PR_URL..."
-          gh pr comment "$PR_URL" --body "@coderabbitai review" || echo "Failed to trigger CodeRabbit review"
+          gh pr comment "$PR_URL" --body "@coderabbitai review"
