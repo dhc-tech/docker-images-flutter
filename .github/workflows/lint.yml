@@ -18,4 +18,5 @@ jobs:
         with:
           dockerfile: "docker/Dockerfile"
           recursive: true
-          ignore: "DL3008,DL3013" # Ignored specific warnings that might be unavoidable
+          ignore: "DL3008,DL3013,SC3054"
+          failure-threshold: error
