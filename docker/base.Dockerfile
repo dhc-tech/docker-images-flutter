@@ -10,7 +10,7 @@
 # ever used as a build stage for the three platform images above. The
 # combined, all-in-one `Dockerfile` at the repo root is unrelated to this
 # file and keeps building independently — see its own header comment.
-FROM ubuntu:26.04@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
+FROM ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
 
 SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
 
