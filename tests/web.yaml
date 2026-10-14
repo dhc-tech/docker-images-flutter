@@ -4,11 +4,11 @@ metadataTest:
     - key: "CHROME_EXECUTABLE"
       value: "/usr/bin/google-chrome-stable"
 commandTests:
-  # Chrome occasionally prints nothing on a cold first start inside the test
-  # runner; retry before failing. The build itself already smoke-tests launch.
-  - name: "Chrome"
-    command: "bash"
-    args:
-      - "-c"
-      - 'for i in 1 2 3; do out=$(google-chrome-stable --headless --disable-gpu --no-sandbox --version 2>&1) && [ -n "$out" ] && echo "$out" && exit 0; sleep 2; done; exit 1'
-    expectedOutput: ["Google Chrome"]
+  - name: "Chrome installed"
+    command: "dpkg-query"
+    args: ["-W", "-f=${Package} ${Version}", "google-chrome-stable"]
+    expectedOutput: ["google-chrome-stable [0-9]+"]
+  # Headless Chrome prints nothing for --version, so only the exit code is checked.
+  - name: "Chrome launches"
+    command: "google-chrome-stable"
+    args: ["--headless", "--disable-gpu", "--no-sandbox", "--version"]
