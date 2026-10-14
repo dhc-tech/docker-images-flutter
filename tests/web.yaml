@@ -7,7 +7,7 @@ commandTests:
   - name: "Chrome installed"
     command: "dpkg-query"
     args: ["-W", "google-chrome-stable"]
-    expectedOutput: ["google-chrome-stable [0-9]+"]
+    expectedOutput: ["google-chrome-stable\\s+[0-9]+"]
   # Exit code only: the printed version is not reliably emitted on a cold start.
   - name: "Chrome launches"
     command: "google-chrome-stable"
