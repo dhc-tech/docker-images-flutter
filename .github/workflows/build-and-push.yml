@@ -226,4 +226,3 @@ jobs:
             *Generated automatically by [${{ github.repository }}](https://github.com/${{ github.repository }})*
           draft: false
           prerelease: false
-
