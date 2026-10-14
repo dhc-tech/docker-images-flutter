@@ -4,11 +4,13 @@
 
 ```
 docker/
-  base.Dockerfile      Ubuntu + git + Firebase CLI + Flutter      -> flutter-base
-  android.Dockerfile   FROM base + scripts/install-android.sh     -> flutter-android
-  web.Dockerfile       FROM base + scripts/install-web.sh         -> flutter-web
-  linux.Dockerfile     FROM base + scripts/install-linux.sh       -> flutter-linux
-  combo.Dockerfile     FROM base + all three scripts              -> flutter
+  Dockerfile           multi-stage, one stage per image:
+                         base     Ubuntu + git + Firebase CLI + Flutter (not published)
+                         android  base + install-android.sh   -> flutter-android
+                         web      base + install-web.sh       -> flutter-web
+                         linux    base + install-linux.sh     -> flutter-linux
+                         combo    android + web + linux       -> flutter
+  docker-bake.hcl      builds and tags all four images in one go (used by build-and-push.yml)
   scripts/             one install script per toolchain
 tests/                 container-structure-test configs: base, android, web, linux
 docs/                  documentation
@@ -26,7 +28,7 @@ All Dockerfiles live in `docker/`, none at the repo root.
 Needs Docker and [container-structure-test](https://github.com/GoogleContainerTools/container-structure-test).
 
 ```bash
-make build-web                       # flutter-base:build, then flutter-web:build
+make build-web                       # builds the web stage as flutter-web:build
 make test-android                    # build + base and android tests
 make test-all
 make build-combo FLUTTER_REF=3.47.7  # override the Flutter version
@@ -43,8 +45,9 @@ Images: `android`, `web`, `linux`, `combo`. `combo` runs every image's tests.
    and env vars are set; avoid exact version output that breaks on minor bumps.
 3. Run `make test-<platform>` and `make test-combo`.
 
-If you add an image, add it to `IMAGES` in the Makefile, the matrix in
-`build-and-push.yml` and `pr-check.yml`, and the health check.
+If you add an image, add a stage to `docker/Dockerfile`, a target to
+`docker/docker-bake.hcl`, and entries in the Makefile `IMAGES`, `pr-check.yml`,
+the cleanup workflow and the health check.
 
 ## Lint
 

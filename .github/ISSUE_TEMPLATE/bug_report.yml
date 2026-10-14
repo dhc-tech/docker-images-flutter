@@ -21,7 +21,6 @@ body:
         - flutter-android
         - flutter-web
         - flutter-linux
-        - flutter-base
     validations:
       required: true
   - type: input

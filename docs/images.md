@@ -1,14 +1,15 @@
 # Images and tags
 
 All images are published to `ghcr.io/dhc-tech/<image>`. Every platform image
-is built `FROM flutter-base` using the scripts in `docker/scripts/`, so a
-toolchain is identical in the single-platform image and in `flutter`.
+is a stage of one `docker/Dockerfile` that shares a common base (Ubuntu,
+Flutter, Firebase CLI) and installs its toolchain with the scripts in
+`docker/scripts/`, so a toolchain is identical in the single-platform image and
+in `flutter`. The base is a build stage only and is not published.
 
 ## Contents
 
-| Image | Adds on top of `flutter-base` |
+| Image | Contents (all include Ubuntu 26.04 with a pinned digest, git, curl, Flutter SDK and Firebase CLI) |
 |---|---|
-| `flutter-base` | Ubuntu 26.04 (pinned digest), git, curl, Flutter SDK, Firebase CLI |
 | `flutter-android` | JDK 21, Android command-line tools, platforms 34, 35, 37 and Flutter's `compileSdk`, build-tools 34-37, CMake 3.22.1, the NDK version Flutter pins |
 | `flutter-web` | Google Chrome stable (amd64 only), `CHROME_EXECUTABLE` set |
 | `flutter-linux` | clang, cmake, ninja, pkg-config, GTK 3, liblzma, Linux desktop enabled |

@@ -2,12 +2,12 @@
 name: Build and push CI image
 
 # Publishes to GHCR:
-#   flutter-base                            Flutter SDK + Firebase CLI
-#   flutter-android / -web / -linux         base + one platform's toolchain
-#   flutter                                 base + Android + Web + Linux
+#   flutter-android / flutter-web / flutter-linux   one platform each
+#   flutter                                          Android + Web + Linux
 # Every toolchain is baked in at build time, so consumers pull a ready image
-# and spend no CI minutes installing SDKs. All platform images are built
-# from docker/scripts/ and share the one published base.
+# and spend no CI minutes installing SDKs. All four are built in a single
+# `docker buildx bake` (docker/docker-bake.hcl), so the shared base stage is
+# built once and every image uses identical Flutter layers.
 #
 # Docker/Linux cannot build iOS, macOS or Windows — those need the real OS.
 #
@@ -24,7 +24,6 @@ on:
       - docker/**
       - FLUTTER_VERSION
       - .github/workflows/build-and-push.yml
-      - .github/workflows/_build-image.yml
   workflow_dispatch:
     inputs:
       version:
@@ -60,50 +59,39 @@ jobs:
             echo "owner=${GITHUB_REPOSITORY_OWNER,,}"
           } >> "$GITHUB_OUTPUT"
 
-  base:
+  publish:
     needs: version
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    uses: ./.github/workflows/_build-image.yml
-    with:
-      image: flutter-base
-      dockerfile: base
-      description: Flutter SDK + Firebase CLI base image
-      owner: ${{ needs.version.outputs.owner }}
-      version: ${{ needs.version.outputs.version }}
-      major_minor: ${{ needs.version.outputs.major_minor }}
-      major: ${{ needs.version.outputs.major }}
-      is_latest: ${{ needs.version.outputs.is_latest == 'true' }}
-      build_args: FLUTTER_REF=${{ needs.version.outputs.version }}
-
-  images:
-    needs: [version, base]
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {image: flutter, dockerfile: combo, description: "Flutter Docker image for CI/CD (Android + Web + Linux)"}
-          - {image: flutter-android, dockerfile: android, description: "Flutter Docker image for CI/CD (android)"}
-          - {image: flutter-web, dockerfile: web, description: "Flutter Docker image for CI/CD (web)"}
-          - {image: flutter-linux, dockerfile: linux, description: "Flutter Docker image for CI/CD (linux)"}
-    uses: ./.github/workflows/_build-image.yml
-    with:
-      image: ${{ matrix.image }}
-      dockerfile: ${{ matrix.dockerfile }}
-      description: ${{ matrix.description }}
-      owner: ${{ needs.version.outputs.owner }}
-      version: ${{ needs.version.outputs.version }}
-      major_minor: ${{ needs.version.outputs.major_minor }}
-      major: ${{ needs.version.outputs.major }}
-      is_latest: ${{ needs.version.outputs.is_latest == 'true' }}
-      build_args: BASE_IMAGE=ghcr.io/${{ needs.version.outputs.owner }}/flutter-base:${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        env:
+          OWNER: ${{ needs.version.outputs.owner }}
+          FLUTTER_REF: ${{ needs.version.outputs.version }}
+          MAJOR_MINOR: ${{ needs.version.outputs.major_minor }}
+          MAJOR: ${{ needs.version.outputs.major }}
+          IS_LATEST: ${{ needs.version.outputs.is_latest }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        with:
+          source: .
+          files: docker/docker-bake.hcl
+          push: true
+          set: |
+            *.cache-from=type=gha,scope=flutter
+            *.cache-to=type=gha,mode=max,scope=flutter
 
   release:
-    needs: [version, images]
+    needs: [version, publish]
     permissions:
       contents: write
     runs-on: ubuntu-latest
