@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.47.7] - 2026-10-14
+
+### Added
+- Official enterprise-grade Docker release for Flutter 3.47.7 (`flutter`, `flutter-android`, `flutter-web`, `flutter-linux`).
+- Fully automated branch deletion (`--delete-branch`) on auto-merge to keep repository clean.
+- PAT-backed auto-merges (`BOT_PAT`) allowing downstream Docker build and release pipelines to trigger seamlessly.
+- Support for on-demand version specification (`inputs.version`) in manual build workflow triggers.
+
+### Fixed
+- Fixed BuildKit attestation error on `build-platforms` docker driver.
+- Fixed image reference in GitHub release asset body.
+
 
 ### Added
 - Automated `needs-approval` and `automerge` label lifecycle via GitHub Actions.

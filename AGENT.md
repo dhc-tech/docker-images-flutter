@@ -8,9 +8,10 @@ This repository provides automated, multi-platform Docker images for Flutter CI/
 ## Core Directives
 1. **Never Break Automation:** The entire release cycle (version bump -> auto-merge -> docker push -> tag) is 100% automated via GitHub Actions. Do not introduce manual steps.
 2. **Security First:** All dependencies (Base images, GitHub Actions) MUST be pinned to SHA-256 hashes. Do not use floating tags like `@v2` or `:latest` in internal workflow configurations.
-3. **Immutability:** Docker tags like `3.24.2` and `pinned` are immutable. Only `stable` and `latest` move.
+3. **Immutability:** Docker tags like `3.47.7` and `pinned` are immutable. Only `stable` and `latest` move.
 4. **Test Before Push:** Always ensure `pre-commit` hooks pass locally. We use Hadolint for Dockerfiles and Yamllint for Workflows.
-5. **PR Review & Auto-merge:** Main branch has strict branch protection (1 approving review required). PRs automatically receive `needs-approval`. Upon approval, `waiting-for-green` tracks running CI; `ci-failed` marks failures; and `automerge` is applied only when all checks pass green, triggering squash auto-merge by `github-actions[bot]`. Bot PRs auto-approve via `BOT_PAT` and wait for green.
+5. **Git Author Identity:** All commits and pushes created for this repository must always use `digvijaysinh2204@gmail.com` as the git author/committer email (`git config user.email "digvijaysinh2204@gmail.com"`).
+6. **PR Review, Auto-merge & Clean Branches:** Main branch has strict branch protection (1 approving review required). PRs automatically receive `needs-approval`. Upon approval, `waiting-for-green` tracks running CI; `ci-failed` marks failures; and `automerge` is applied only when all checks pass green. Bot PRs (and approved PRs) auto-merge using `BOT_PAT` (`GH_PAT_WORKFLOW`) and `--delete-branch`, ensuring merged branches are immediately deleted and downstream Docker release workflows (`build-and-push.yml`) trigger without suppression.
 
 ## Architecture
 - `docker/`: Contains all Dockerfiles. The `Dockerfile` is the combo image. `base.Dockerfile` is the shared layer for the platform-specific images (`android`, `web`, `linux`).

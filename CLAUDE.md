@@ -16,11 +16,11 @@ When asked to modify the CI/CD pipeline, always check:
 - `.dockerignore` to ensure the context remains small.
 
 ## Pull Requests & Auto-merge Rules
+- Always use `digvijaysinh2204@gmail.com` as the git author/committer email (`git config user.email "digvijaysinh2204@gmail.com"`).
 - Human PRs strictly require 1 approving human review; never attempt to bypass.
 - When opened or updated, PRs automatically receive the `needs-approval` label.
 - When approved by a maintainer, `needs-approval` is removed and `waiting-for-green` is applied while CI runs.
 - If any CI check fails, `ci-failed` is applied and auto-merge is blocked.
-- Once all CI checks are green and approved, `automerge` is applied and the PR is squash-merged by `github-actions[bot]`.
-- Bot PRs (Flutter bumps, Dependabot) auto-approve using `BOT_PAT` and wait for all checks to pass green before merging.
-- All automerge and label operations are attributed to `github-actions[bot]`.
+- Once all CI checks are green and approved, `automerge` is applied and the PR is squash-merged via `BOT_PAT` (`GH_PAT_WORKFLOW`) with `--delete-branch`, ensuring merged branches are cleaned up automatically and downstream Docker release workflows (`build-and-push.yml`) trigger without suppression.
+- Bot PRs (Flutter bumps, Dependabot) auto-approve using `BOT_PAT` and wait for all checks to pass green before merging with `--delete-branch`.
 
