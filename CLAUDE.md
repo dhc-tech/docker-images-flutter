@@ -16,7 +16,7 @@ When asked to modify the CI/CD pipeline, always check:
 - `.dockerignore` to ensure the context remains small.
 
 ## Pull Requests & Auto-merge Rules
-- Always use `digvijaysinh2204@gmail.com` as the git author/committer email (`git config user.email "digvijaysinh2204@gmail.com"`).
+- Ensure all commits and pushes preserve the maintainer's configured author identity in local git config. Never expose personal email addresses in public repository files.
 - Human PRs strictly require 1 approving human review; never attempt to bypass.
 - When opened or updated, PRs automatically receive the `needs-approval` label.
 - When approved by a maintainer, `needs-approval` is removed and `waiting-for-green` is applied while CI runs.
