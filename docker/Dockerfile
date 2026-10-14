@@ -146,15 +146,25 @@ RUN GRADLE_UTILS="${FLUTTER_HOME}/packages/flutter_tools/lib/src/android/gradle_
     && COMPILE_SDK=$(grep -oE "compileSdkVersionInt = [0-9]+" "${GRADLE_UTILS}" | grep -oE "[0-9]+") \
     && NDK_VERSION=$(grep -oE "ndkVersion = '[0-9.]+'" "${GRADLE_UTILS}" | grep -oE "[0-9.]+") \
     && test -n "${COMPILE_SDK}" && test -n "${NDK_VERSION}" \
-    && echo "Installing Flutter's official compileSdk: android-${COMPILE_SDK}, NDK: ${NDK_VERSION}" \
-    && sdkmanager "platforms;android-${COMPILE_SDK}" "ndk;${NDK_VERSION}" \
+    && echo "Installing Android SDK platforms (34-37), build-tools (34-37), and official NDK (${NDK_VERSION})..." \
+    && sdkmanager \
+        "platforms;android-${COMPILE_SDK}" \
+        "platforms;android-37.0" \
+        "platforms;android-35" \
+        "platforms;android-34" \
+        "build-tools;37.0.0" \
+        "build-tools;36.0.0" \
+        "build-tools;35.0.0" \
+        "build-tools;34.0.0" \
+        "ndk;${NDK_VERSION}" \
     && echo "${COMPILE_SDK}" > /opt/flutter-compilesdk-version.txt \
     && echo "${NDK_VERSION}" > /opt/flutter-ndk-version.txt \
-    # The NDK download alone is several hundred MB to 1GB+ — same
-    # leftover-temp-file issue as the cmake sdkmanager call above, just
-    # never cleaned up here. Every consumer pulling this image pays for
-    # that dead weight on every pull otherwise.
+    && ln -s "${ANDROID_HOME}/ndk/${NDK_VERSION}" "${ANDROID_HOME}/ndk-bundle" \
     && rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache
+
+ENV ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/28.2.13676358
+ENV ANDROID_NDK_ROOT=${ANDROID_NDK_HOME}
+ENV PATH="${ANDROID_NDK_HOME}:${PATH}"
 
 # Bake in the exact ref this image was built for, so a build using it can
 # assert against it the same way a consuming pipeline's own version check

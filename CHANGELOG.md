@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fully automated branch deletion (`--delete-branch`) on auto-merge to keep repository clean.
 - PAT-backed auto-merges (`BOT_PAT`) allowing downstream Docker build and release pipelines to trigger seamlessly.
 - Support for on-demand version specification (`inputs.version`) in manual build workflow triggers.
+- Pre-installed Android SDK platforms (34, 35, 36, 37.0), build-tools (34.0.0 through 37.0.0), and official NDK (r28) with `ANDROID_NDK_HOME` for zero-runtime-download builds.
 
 ### Fixed
 - Fixed BuildKit attestation error on `build-platforms` docker driver.

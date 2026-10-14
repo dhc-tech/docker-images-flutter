@@ -40,8 +40,8 @@ credentials), both resolving Flutter versions the exact same way (see
 
 | Image | What it has | Pick this if you want... |
 |---|---|---|
-| `flutter` | Android SDK + Chrome + Linux desktop toolchain, all in one image | Building for more than one platform in the same pipeline, or you don't care about image size |
-| `flutter-android` | Just the Android SDK | Only building Android — no Chrome, no Linux desktop toolchain wasting your pull time/bandwidth |
+| `flutter` | Android SDK (Platforms 34-37 + Build-Tools 34-37 + NDK r28 + CMake) + Chrome + Linux desktop toolchain | All-in-one image with full Android/Web/Linux tooling pre-installed with zero runtime downloads |
+| `flutter-android` | Android SDK (Platforms 34-37 + Build-Tools 34-37 + NDK r28 + CMake) | Only building Android — no Chrome, no Linux desktop toolchain, zero runtime SDK/NDK downloads |
 | `flutter-web` | Just Chrome | Only building Web |
 | `flutter-linux` | Just the Linux desktop toolchain | Only building Linux desktop |
 
