@@ -31,7 +31,8 @@ specific Flutter version; it does not move `latest`, `pinned` or `stable`.
 
 Other workflows: `image-health-check.yml` pulls the published `:stable` images
 weekly and runs `flutter doctor -v`; `cleanup-ghcr-packages.yml` removes
-untagged package versions.
+untagged package versions older than 7 days every Sunday (tagged versions and
+attestation/multi-arch child manifests are kept; manual runs default to dry-run).
 
 ## One-time repository setup
 
