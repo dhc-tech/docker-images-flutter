@@ -7,4 +7,4 @@ LICENSE
 FLUTTER_VERSION
 Makefile
 tests
-docker/*.Dockerfile
+docker/Dockerfile

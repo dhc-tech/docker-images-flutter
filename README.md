@@ -25,7 +25,6 @@ Public on `ghcr.io/dhc-tech`, no registry credentials needed.
 | `flutter-web` | Flutter, headless Chrome | Web only |
 | `flutter-linux` | Flutter, Linux desktop toolchain | Linux desktop only |
 | `flutter` | Everything above | Several platforms in one pipeline |
-| `flutter-base` | Flutter, Firebase CLI | Your own custom image |
 
 ```yaml
 # GitHub Actions

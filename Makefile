@@ -1,17 +1,17 @@
 IMAGES := android web linux combo
 FLUTTER_REF ?= $(shell cat FLUTTER_VERSION)
 
-.PHONY: help install-hooks lint build-base build-all test-all clean $(addprefix build-,$(IMAGES)) $(addprefix test-,$(IMAGES)) test-base
+.PHONY: help install-hooks lint build-all test-all clean $(addprefix build-,$(IMAGES)) $(addprefix test-,$(IMAGES))
 
 help:
 	@echo "make install-hooks   - install pre-commit hooks"
 	@echo "make lint            - run pre-commit on all files"
-	@echo "make build-base      - build flutter-base:build (FLUTTER_REF=$(FLUTTER_REF))"
 	@echo "make build-<image>   - build flutter-<image>:build, image = $(IMAGES)"
-	@echo "make test-<image>    - build + container-structure-test, image = base $(IMAGES)"
+	@echo "make test-<image>    - build + container-structure-test, image = $(IMAGES)"
 	@echo "make build-all       - build every image"
 	@echo "make test-all        - test every image"
 	@echo "make clean           - remove local images"
+	@echo "FLUTTER_REF=$(FLUTTER_REF) (override: make build-web FLUTTER_REF=3.47.2)"
 
 install-hooks:
 	pre-commit install
@@ -19,14 +19,8 @@ install-hooks:
 lint:
 	pre-commit run --all-files
 
-build-base:
-	docker build -t flutter-base:build -f docker/base.Dockerfile --build-arg FLUTTER_REF=$(FLUTTER_REF) .
-
-$(addprefix build-,$(IMAGES)): build-%: build-base
-	docker build -t flutter-$*:build -f docker/$*.Dockerfile --build-arg BASE_IMAGE=flutter-base:build .
-
-test-base: build-base
-	container-structure-test test --image flutter-base:build --config tests/base.yaml
+$(addprefix build-,$(IMAGES)): build-%:
+	docker build -f docker/Dockerfile --target $* -t flutter-$*:build --build-arg FLUTTER_REF=$(FLUTTER_REF) .
 
 # combo runs every platform's tests.
 test-combo: build-combo
@@ -37,8 +31,8 @@ $(addprefix test-,android web linux): test-%: build-%
 
 build-all: $(addprefix build-,$(IMAGES))
 
-test-all: test-base $(addprefix test-,$(IMAGES))
+test-all: $(addprefix test-,$(IMAGES))
 
 clean:
-	docker rmi -f flutter-base:build $(addsuffix :build,$(addprefix flutter-,$(IMAGES))) 2>/dev/null || true
+	docker rmi -f $(addsuffix :build,$(addprefix flutter-,$(IMAGES))) 2>/dev/null || true
 	docker image prune -f

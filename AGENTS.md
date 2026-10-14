@@ -5,13 +5,13 @@ Applies to Claude, Cursor and any other assistant. Human contributors: see
 
 ## What this repo is
 
-Automated Flutter CI Docker images (`flutter-base`, `flutter-android`,
+Automated Flutter CI Docker images (`flutter-android`,
 `flutter-web`, `flutter-linux`, `flutter`) published to GHCR. The release cycle
 (version bump, auto-merge, build, push, release) is fully automated.
 
 ## Structure
 
-- `docker/*.Dockerfile` — thin wrappers; toolchain logic is in `docker/scripts/install-*.sh`. No Dockerfiles at the repo root.
+- `docker/Dockerfile` — one multi-stage file (`base`, `android`, `web`, `linux`, `combo`); toolchain logic is in `docker/scripts/install-*.sh`; `docker/docker-bake.hcl` publishes all images in one build. No Dockerfiles at the repo root. `base` is a build stage only and is never published.
 - `tests/<image>.yaml` — container-structure-test; `combo` runs all of them.
 - `FLUTTER_VERSION` — only changed by `check-flutter-version.yml`.
 - `docs/` — documentation. Update the matching doc when behaviour changes.
@@ -27,7 +27,7 @@ Full layout: [docs/development.md](docs/development.md).
 5. **YAML:** follow `.yamllint`; do not reflow long commands.
 6. **Verify:** run `pre-commit run --all-files` and `make test-<image>` for any image you touched.
 7. **Tests:** every image has `tests/<image>.yaml`; test that binaries run and env vars exist, not exact version output.
-8. **Workflows:** token permissions `contents: read` at top level, write per job. Keep `.dockerignore` tight. Do not rename the required checks `build-check` and `build-check-platforms`. When changing CI, check `build-and-push.yml`, `_build-image.yml`, `pr-check.yml`, `.github/actions/build-and-test` and `auto-merge.yml`.
+8. **Workflows:** token permissions `contents: read` at top level, write per job. Keep `.dockerignore` tight. Do not rename the required checks `build-check` and `build-check-platforms`. When changing CI, check `build-and-push.yml`, `pr-check.yml`, `.github/actions/build-and-test` and `auto-merge.yml`.
 9. **Security review** for workflow or Dockerfile changes: no unpinned dependencies, minimal permissions, Scorecard rules respected.
 
 ## Git and PRs

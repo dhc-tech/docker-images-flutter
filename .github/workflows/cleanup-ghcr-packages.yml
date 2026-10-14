@@ -34,7 +34,7 @@ jobs:
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
-          image-names: "flutter flutter-base flutter-android flutter-web flutter-linux"
+          image-names: "flutter flutter-android flutter-web flutter-linux"
           tag-selection: untagged
           cut-off: 7d
           dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}

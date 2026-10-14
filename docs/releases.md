@@ -21,9 +21,10 @@ only when this PR merges, never on a poll of the branch.
    [automation.md](automation.md)).
 3. The merge to `main` triggers `build-and-push.yml`:
    - `version` resolves the version and tags.
-   - `base` builds and pushes `flutter-base`.
-   - `images` builds `flutter`, `flutter-android`, `flutter-web` and
-     `flutter-linux` on top of it, in parallel, using `_build-image.yml`.
+   - `publish` runs one `docker buildx bake` (`docker/docker-bake.hcl`) that
+     builds and pushes `flutter`, `flutter-android`, `flutter-web` and
+     `flutter-linux` with provenance and SBOM. The shared base stage is built
+     once, so all four use identical Flutter layers.
    - `release` creates the GitHub release.
 
 A manual run (`workflow_dispatch`) accepts a `version` input to build a
