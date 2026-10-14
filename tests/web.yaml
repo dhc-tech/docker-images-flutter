@@ -1,0 +1,10 @@
+schemaVersion: "2.0.0"
+metadataTest:
+  envVars:
+    - key: "CHROME_EXECUTABLE"
+      value: "/usr/bin/google-chrome-stable"
+commandTests:
+  - name: "Chrome"
+    command: "google-chrome-stable"
+    args: ["--version"]
+    expectedOutput: ["Google Chrome"]

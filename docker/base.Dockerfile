@@ -1,15 +1,10 @@
-# Shared base layer for the platform-specific images (android.Dockerfile,
-# web.Dockerfile, linux.Dockerfile) — everything every platform needs:
-# base Ubuntu, Firebase CLI, and the Flutter SDK itself. Each platform
-# Dockerfile builds FROM this (via the BASE_IMAGE build-arg — see
-# build-and-push.yml) and adds only its own platform's tooling, instead of
-# every consumer downloading Chrome AND the Linux desktop toolchain AND
-# the Android SDK regardless of which one they actually build for.
+# Shared base layer for every image: Ubuntu, Firebase CLI and the Flutter
+# SDK. android/web/linux/combo.Dockerfile build FROM this (BASE_IMAGE
+# build-arg) and add only their own toolchain via docker/scripts/.
+# Published as `flutter-base`, so each image build pulls it instead of
+# redoing the Flutter clone.
 #
-# Not published as its own image — built and loaded locally in CI, only
-# ever used as a build stage for the three platform images above. The
-# combined, all-in-one `Dockerfile` at the repo root is unrelated to this
-# file and keeps building independently — see its own header comment.
+# FLUTTER_REF: a git tag (e.g. 3.47.2) or branch name (stable/beta/main).
 FROM ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
 
 SHELL ["/bin/bash", "-eo", "pipefail", "-c"]

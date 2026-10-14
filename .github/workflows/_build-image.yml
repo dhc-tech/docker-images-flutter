@@ -1,0 +1,82 @@
+---
+name: Build image (reusable)
+
+# Builds one image and pushes it to GHCR with provenance + SBOM. Called by
+# build-and-push.yml for the base image and for every image built on it.
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: GHCR image name, e.g. flutter-android
+        required: true
+        type: string
+      dockerfile:
+        description: Dockerfile name under docker/, e.g. android
+        required: true
+        type: string
+      description:
+        required: true
+        type: string
+      owner:
+        description: Lowercased registry owner
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      major_minor:
+        required: true
+        type: string
+      major:
+        required: true
+        type: string
+      is_latest:
+        required: true
+        type: boolean
+      build_args:
+        description: Newline-separated Docker build args
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ inputs.owner }}/${{ inputs.image }}
+          tags: |
+            type=raw,value=${{ inputs.version }}
+            type=raw,value=${{ inputs.major_minor }}
+            type=raw,value=${{ inputs.major }}
+            type=raw,value=latest,enable=${{ inputs.is_latest }}
+            type=raw,value=pinned,enable=${{ inputs.is_latest }}
+            type=raw,value=stable,enable=${{ inputs.is_latest }}
+          labels: |
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.licenses=MIT
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: docker/${{ inputs.dockerfile }}.Dockerfile
+          push: true
+          provenance: true
+          sbom: true
+          build-args: ${{ inputs.build_args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ inputs.image }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.image }}

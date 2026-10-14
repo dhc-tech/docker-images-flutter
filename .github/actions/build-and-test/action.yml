@@ -1,0 +1,90 @@
+name: Build and test image
+description: >-
+  Builds the shared base plus one image locally (no push) and runs its
+  container-structure-tests. Skips cleanly when the PR does not touch
+  anything that image is built from. Requires a prior checkout with
+  fetch-depth 0.
+
+inputs:
+  image:
+    description: base | android | web | linux | combo
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check whether this image is affected
+      id: changed
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -e
+        case "$IMAGE" in
+          combo) pattern='^(docker/|tests/|FLUTTER_VERSION$|\.github/actions/build-and-test/)' ;;
+          *) pattern="^(docker/(base|${IMAGE})\.Dockerfile|docker/scripts/install-${IMAGE}\.sh|tests/(base|${IMAGE})\.yaml|FLUTTER_VERSION$|\.github/actions/build-and-test/)" ;;
+        esac
+        if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE "$pattern"; then
+          echo "affected=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "affected=false" >> "$GITHUB_OUTPUT"
+          echo "Nothing $IMAGE is built from changed — skipping."
+        fi
+
+    - if: steps.changed.outputs.affected == 'true'
+      id: pinned
+      shell: bash
+      run: echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+
+    - if: steps.changed.outputs.affected == 'true'
+      name: Install container-structure-test
+      shell: bash
+      run: |
+        curl -fsSLo container-structure-test https://storage.googleapis.com/container-structure-test/v1.22.1/container-structure-test-linux-amd64
+        chmod +x container-structure-test
+        sudo mv container-structure-test /usr/local/bin/
+
+    # driver: docker (not docker-container): a later `FROM flutter-base:build`
+    # can only see the image `load`ed into the host engine with this driver.
+    - if: steps.changed.outputs.affected == 'true'
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      with:
+        driver: docker
+
+    - if: steps.changed.outputs.affected == 'true'
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+      with:
+        context: .
+        file: docker/base.Dockerfile
+        load: true
+        tags: flutter-base:build
+        build-args: |
+          FLUTTER_REF=${{ steps.pinned.outputs.version }}
+
+    - if: steps.changed.outputs.affected == 'true'
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+      with:
+        context: .
+        file: docker/${{ inputs.image }}.Dockerfile
+        load: true
+        tags: flutter-${{ inputs.image }}:build
+        build-args: |
+          BASE_IMAGE=flutter-base:build
+
+    # combo = every platform, so it runs every platform's tests.
+    - if: steps.changed.outputs.affected == 'true'
+      name: Run container-structure-test
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+      run: |
+        set -e
+        configs=(--config tests/base.yaml)
+        if [ "$IMAGE" = combo ]; then
+          configs+=(--config tests/android.yaml --config tests/web.yaml --config tests/linux.yaml)
+        else
+          configs+=(--config "tests/${IMAGE}.yaml")
+        fi
+        container-structure-test test --image "flutter-${IMAGE}:build" "${configs[@]}"

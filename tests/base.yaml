@@ -12,3 +12,9 @@ commandTests:
     command: "git"
     args: ["--version"]
     expectedOutput: ["git version"]
+  - name: "Flutter"
+    command: "flutter"
+    args: ["--version"]
+    expectedOutput: ["Flutter"]
+fileExistenceTests:
+  - {name: "Flutter ref recorded", path: "/opt/flutter-ref.txt", shouldExist: true}
