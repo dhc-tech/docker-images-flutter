@@ -27,11 +27,13 @@ jobs:
   cleanup:
     name: Clean untagged versions
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
       - uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
           account: user
-          token: ${{ secrets.GH_PAT_WORKFLOW }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "flutter flutter-base flutter-android flutter-web flutter-linux"
           tag-selection: untagged
           cut-off: 7d
