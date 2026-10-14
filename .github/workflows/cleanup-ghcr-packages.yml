@@ -1,0 +1,43 @@
+name: Cleanup GHCR Container Versions
+
+# Periodically and manually purges untagged container image digests and stale
+# intermediate layers from GitHub Container Registry (GHCR), preserving all
+# official tagged releases from the 3.47 series upwards (3.47.*, stable, latest, pinned).
+
+on:
+  schedule:
+    # Runs every Sunday at 02:00 UTC
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      delete_untagged_only:
+        description: "Delete only untagged versions (keeps all tagged releases)"
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  cleanup-packages:
+    name: Clean ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - flutter
+          - flutter-android
+          - flutter-web
+          - flutter-linux
+    steps:
+      - name: Purge untagged container digests for ${{ matrix.package }}
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: 'container'
+          delete-only-untagged-versions: ${{ github.event.inputs.delete_untagged_only || 'true' }}
+          ignore-versions: '^(3\.47\..*|stable|latest|pinned)$'
+          token: ${{ secrets.GH_PAT_WORKFLOW }}
