@@ -1,20 +1,17 @@
-.PHONY: help install-hooks lint test-combo test-base test-all build-combo build-base build-android build-web build-linux build-all clean
+IMAGES := android web linux combo
+FLUTTER_REF ?= $(shell cat FLUTTER_VERSION)
 
-# Default target
+.PHONY: help install-hooks lint build-base build-all test-all clean $(addprefix build-,$(IMAGES)) $(addprefix test-,$(IMAGES)) test-base
+
 help:
-	@echo "Available commands:"
-	@echo "  make install-hooks    - Install pre-commit hooks"
-	@echo "  make lint             - Run pre-commit checks on all files (Hadolint, Yamllint, etc.)"
-	@echo "  make build-combo      - Build the main 'flutter' combo image"
-	@echo "  make build-base       - Build the 'flutter-base' image (required for platforms)"
-	@echo "  make build-android    - Build the 'flutter-android' image"
-	@echo "  make build-web        - Build the 'flutter-web' image"
-	@echo "  make build-linux      - Build the 'flutter-linux' image"
-	@echo "  make build-all        - Build all images in sequence"
-	@echo "  make test-combo       - Run container-structure-test on the combo image"
-	@echo "  make test-base        - Run container-structure-test on the base image"
-	@echo "  make test-all         - Run all container-structure-tests"
-	@echo "  make clean            - Remove local build and dangling container images"
+	@echo "make install-hooks   - install pre-commit hooks"
+	@echo "make lint            - run pre-commit on all files"
+	@echo "make build-base      - build flutter-base:build (FLUTTER_REF=$(FLUTTER_REF))"
+	@echo "make build-<image>   - build flutter-<image>:build, image = $(IMAGES)"
+	@echo "make test-<image>    - build + container-structure-test, image = base $(IMAGES)"
+	@echo "make build-all       - build every image"
+	@echo "make test-all        - test every image"
+	@echo "make clean           - remove local images"
 
 install-hooks:
 	pre-commit install
@@ -22,31 +19,26 @@ install-hooks:
 lint:
 	pre-commit run --all-files
 
-build-combo:
-	docker build -t flutter:build -f docker/Dockerfile .
-
 build-base:
-	docker build -t flutter-base:build -f docker/base.Dockerfile .
+	docker build -t flutter-base:build -f docker/base.Dockerfile --build-arg FLUTTER_REF=$(FLUTTER_REF) .
 
-build-android: build-base
-	docker build -t flutter-android:local -f docker/android.Dockerfile --build-arg BASE_IMAGE=flutter-base:build .
-
-build-web: build-base
-	docker build -t flutter-web:local -f docker/web.Dockerfile --build-arg BASE_IMAGE=flutter-base:build .
-
-build-linux: build-base
-	docker build -t flutter-linux:local -f docker/linux.Dockerfile --build-arg BASE_IMAGE=flutter-base:build .
-
-test-combo: build-combo
-	container-structure-test test --image flutter:build --config tests/flutter-combo.yaml
+$(addprefix build-,$(IMAGES)): build-%: build-base
+	docker build -t flutter-$*:build -f docker/$*.Dockerfile --build-arg BASE_IMAGE=flutter-base:build .
 
 test-base: build-base
-	container-structure-test test --image flutter-base:build --config tests/flutter-base.yaml
+	container-structure-test test --image flutter-base:build --config tests/base.yaml
 
-build-all: build-combo build-android build-web build-linux
+# combo runs every platform's tests.
+test-combo: build-combo
+	container-structure-test test --image flutter-combo:build $(addprefix --config tests/,base.yaml android.yaml web.yaml linux.yaml)
 
-test-all: test-combo test-base
+$(addprefix test-,android web linux): test-%: build-%
+	container-structure-test test --image flutter-$*:build --config tests/base.yaml --config tests/$*.yaml
+
+build-all: $(addprefix build-,$(IMAGES))
+
+test-all: test-base $(addprefix test-,$(IMAGES))
 
 clean:
-	docker rmi -f flutter:build flutter-base:build flutter-android:local flutter-web:local flutter-linux:local 2>/dev/null || true
+	docker rmi -f flutter-base:build $(addsuffix :build,$(addprefix flutter-,$(IMAGES))) 2>/dev/null || true
 	docker image prune -f

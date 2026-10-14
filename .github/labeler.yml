@@ -24,8 +24,8 @@ testing:
 
 devops:
   - any:
-      - '.agent/**'
-      - '.cursorrules'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
       - '.pre-commit-config.yaml'
       - '.yamllint'
       - 'Makefile'

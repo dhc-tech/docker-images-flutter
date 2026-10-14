@@ -1,0 +1,26 @@
+schemaVersion: "2.0.0"
+metadataTest:
+  envVars:
+    - key: "ANDROID_HOME"
+      value: "/opt/android-sdk"
+    - key: "ANDROID_NDK_HOME"
+      value: "/opt/android-sdk/ndk-bundle"
+commandTests:
+  - name: "Android SDK manager"
+    command: "sdkmanager"
+    args: ["--version"]
+    expectedOutput: ["[0-9]+"]
+  - name: "Java"
+    command: "java"
+    args: ["--version"]
+    expectedOutput: ["OpenJDK"]
+  - name: "NDK matches the one recorded at build time"
+    command: "bash"
+    args: ["-c", "test -d /opt/android-sdk/ndk/$(cat /opt/flutter-ndk-version.txt)"]
+fileExistenceTests:
+  - {name: "NDK symlink", path: "/opt/android-sdk/ndk-bundle", shouldExist: true}
+  - {name: "platform 34", path: "/opt/android-sdk/platforms/android-34", shouldExist: true}
+  - {name: "platform 35", path: "/opt/android-sdk/platforms/android-35", shouldExist: true}
+  - {name: "build-tools 34", path: "/opt/android-sdk/build-tools/34.0.0", shouldExist: true}
+  - {name: "build-tools 35", path: "/opt/android-sdk/build-tools/35.0.0", shouldExist: true}
+  - {name: "licenses accepted", path: "/opt/android-sdk/licenses", shouldExist: true}

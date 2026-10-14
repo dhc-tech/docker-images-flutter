@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- One install script per toolchain (`docker/scripts/install-{android,web,linux}.sh`) shared by the platform and combo images; `docker/Dockerfile` renamed to `docker/combo.Dockerfile`.
+- `flutter-base` is now published and every image is built on it (single Ubuntu digest, single Flutter clone).
+- `build-and-push.yml` split into a version job, a reusable `_build-image.yml`, and a release job; all images now get provenance and SBOM.
+- `pr-check.yml` builds and tests every image through the `build-and-test` composite action.
+- Tests split per image (`tests/{base,android,web,linux}.yaml`); `container-structure-test` pinned to v1.22.1.
+- Makefile uses pattern rules (`make test-android`, `make build-all`, ...).
+
+### Docs
+- Documentation moved into `docs/` (images, usage, releases, automation, development, supply chain); README shortened. `AGENT.md`, `.agent/` and `.cursorrules` content merged into a single `AGENTS.md`; `CLAUDE.md` imports it.
+
+### Fixed
+- `ANDROID_NDK_HOME` now points at the `ndk-bundle` symlink instead of a hardcoded NDK version.
+- GitHub release notes listed the same tag three times instead of `<version>`, `<major.minor>`, `<major>`.
+
 ## [3.47.7] - 2026-10-14
 
 ### Added
