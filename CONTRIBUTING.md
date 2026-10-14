@@ -28,6 +28,14 @@ Now, every time you run `git commit`, `pre-commit` will automatically run:
 
 If any check fails, the commit will be blocked. You must fix the errors and try committing again.
 
+### Building and testing images
+
+```bash
+make test-android   # also: test-web, test-linux, test-combo, test-all
+```
+
+Toolchain changes go in `docker/scripts/install-<platform>.sh` (shared by the platform image and the combo image), not in the Dockerfiles. Add or update the matching `tests/<platform>.yaml` check. Requires Docker and `container-structure-test`.
+
 ### Manual Testing
 
 You can also run the checks manually on all files without committing:
@@ -41,7 +49,7 @@ pre-commit run --all-files
 2. Make your changes and ensure `pre-commit` checks pass.
 3. Push to your branch and open a Pull Request.
 4. Fill out the provided Pull Request template completely.
-5. Wait for the automated CI quality gates to pass (Docker tests, CodeQL, Hadolint, Yamllint).
+5. Wait for the automated CI quality gates to pass (image build + container-structure-test, Hadolint, Yamllint).
 
 ### Approvals & Auto-merge Lifecycle
  

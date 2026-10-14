@@ -8,17 +8,18 @@
 [![Release](https://img.shields.io/github/v/release/dhc-tech/docker-images-flutter?color=blue&label=release)](https://github.com/dhc-tech/docker-images-flutter/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A self-owned Flutter CI Docker image — built from scratch on plain
-Ubuntu, no third-party Android/Flutter base image. Installs the Android
-SDK command-line tools, Google Chrome, and the Linux desktop toolchain
-directly from their official sources, then Flutter itself. Every version
+Prebuilt Flutter CI Docker images — built from scratch on plain Ubuntu,
+no third-party Android/Flutter base image. Everything (Android SDK, NDK,
+Chrome, Linux desktop toolchain, Flutter, Firebase CLI) is installed at
+image build time from official sources, so your CI pulls a ready image and
+spends **no minutes installing SDKs**. Every version
 this image ever ships is resolved **dynamically from
 [github.com/flutter/flutter](https://github.com/flutter/flutter)
 directly** — nothing here is a hand-picked or hardcoded Flutter version;
 see [How versions are resolved](#how-versions-are-resolved) below.
 
-Covers **Android, Web, and Linux desktop** — as either one all-in-one
-image, or three separate per-platform images (see
+Covers **Android, Web, and Linux desktop** — as one all-in-one image, or
+as separate per-platform images so you only pull what you build (see
 [Which image should I use](#which-image-should-i-use) below). Does
 **not** and cannot build iOS, macOS, or Windows — those need the real OS
 + toolchain (Xcode on macOS, MSVC on Windows). That's an Apple/Microsoft
@@ -35,8 +36,8 @@ Docker/Linux container anywhere can do it.
 
 ## Which image should I use
 
-Two families, both public on `ghcr.io/dhc-tech` (pull with no registry
-credentials), both resolving Flutter versions the exact same way (see
+All public on `ghcr.io/dhc-tech` (pull with no registry credentials), all
+resolving Flutter versions the exact same way (see
 [How versions are resolved](#how-versions-are-resolved)):
 
 | Image | What it has | Pick this if you want... |
@@ -45,18 +46,18 @@ credentials), both resolving Flutter versions the exact same way (see
 | `flutter-android` | Android SDK (Platforms 34-37 + Build-Tools 34-37 + NDK r28 + CMake) | Only building Android — no Chrome, no Linux desktop toolchain, zero runtime SDK/NDK downloads |
 | `flutter-web` | Just Chrome | Only building Web |
 | `flutter-linux` | Just the Linux desktop toolchain | Only building Linux desktop |
+| `flutter-base` | Flutter SDK + Firebase CLI only | A starting point for your own image; every image above is built `FROM` it |
 
-The 3 split images exist because most consumers only build for one
-platform in a given pipeline — bundling all three into every image means
-an Android-only build pulls Chrome and the Linux desktop toolchain for no
-reason, on every pull, in every CI run. `flutter` (the original,
-all-in-one image) is kept alongside them, unchanged, for anyone who
-builds multiple platforms in one pipeline and would otherwise need to
-pull multiple split images anyway.
+The per-platform images exist because most pipelines build for one
+platform — bundling everything means an Android-only build would pull
+Chrome and the Linux desktop toolchain on every run. `flutter` has all
+three for pipelines that build several platforms. All of them are built
+from the same install scripts (`docker/scripts/`), so a toolchain is
+identical whichever image you pick.
 
 ## Tags
 
-Every image above uses the same two tags:
+Every image above uses the same tags:
 
 | Tag | What it is | Pick this if you want... | Rebuilds |
 |---|---|---|---|
@@ -72,7 +73,7 @@ day-to-day and reproducible builds. See
 [docs.flutter.dev/release/upgrade](https://docs.flutter.dev/release/upgrade)
 for Flutter's own explanation of its channels.
 
-Docker image tags follow strict Semantic Versioning (`3.x.x`, `3.x`, `3`, `latest`, `stable`).
+Besides those, `<major>.<minor>` (e.g. `3.47`), `<major>` (e.g. `3`) and `latest` are also published and move with each new release.
 
 ## How versions are resolved
 
@@ -89,8 +90,8 @@ manifest or a guess. If that differs from the version recorded in
 `FLUTTER_VERSION`, it opens a PR bumping the file.
 
 `stable` and `<version>`/`pinned` are then built and pushed **together,
-from that same `FLUTTER_VERSION` value**, for all 4 images (`flutter`,
-`flutter-android`, `flutter-web`, `flutter-linux`) — only when that PR
+from that same `FLUTTER_VERSION` value**, for all images (`flutter-base`,
+then `flutter`, `flutter-android`, `flutter-web`, `flutter-linux`) — only when that PR
 merges (see `build-and-push.yml`), not on a separate poll of
 flutter/flutter's `stable` branch. This is deliberate: the branch's HEAD
 commit can move without a new version being tagged yet, and rebuilding
@@ -104,7 +105,8 @@ This repository employs strict, industry-standard DevOps practices to ensure sec
 
 - **Semantic Versioning & Docker Metadata:** Docker images are tagged properly using `docker/metadata-action`, supporting major, minor, and patch SemVer tags (e.g., `3`, `3.47`, `3.47.7`, `latest`, `stable`). Standard OCI metadata labels (`org.opencontainers.image.source`, `org.opencontainers.image.licenses`, etc.) are natively embedded.
 - **Supply Chain Security:** All GitHub Action dependencies are pinned to absolute 40-character SHA hashes. Base Docker images (like `ubuntu:26.04`) are pinned to SHA256 digests to protect against supply-chain poisoning.
-- **Continuous Integration Quality Gates:** 
+- **Continuous Integration Quality Gates:**
+  - **Build + container-structure-test** runs for every affected image on each PR (`tests/<image>.yaml`; `flutter` runs all of them).
   - **Hadolint** runs on all Pull Requests to statically analyze and enforce Dockerfile best practices.
   - **Yamllint** ensures strict, clean YAML formatting across all GitHub Actions workflows.
 - **Automated Dependency Management:** Dependabot runs weekly to keep base images and GitHub actions updated, utilizing **Dependabot Groups** to bundle all updates into single, manageable PRs.
@@ -126,12 +128,13 @@ auto-merged, even if it happens to touch the same files:
 
 For either:
 
-1. `pr-check.yml` builds the affected Dockerfile(s) against the change
-   (no push) to confirm they actually build before anything merges —
+1. `pr-check.yml` builds the affected image(s) against the change (no
+   push) and runs their container-structure-tests before anything merges —
    `build-check` for the combo `flutter` image, `build-check-platforms`
-   for the 3 split images — for a workflow-only Dependabot PR that can't
-   affect either, both skip the actual build and pass immediately
-   instead.
+   for android/web/linux — via the shared
+   `.github/actions/build-and-test` action. For a PR that touches nothing
+   an image is built from (e.g. a workflow-only Dependabot PR), the build
+   is skipped and the check passes immediately.
 2. `auto-merge.yml` — checks the PR's live author/label (not the
    `opened` event's payload, which isn't reliably populated with a label
    set at PR-creation time) — enables GitHub's native auto-merge, which
@@ -140,9 +143,11 @@ For either:
    hard-restricted, read-only token on plain `pull_request` regardless of
    repository settings. No manual click required end to end.
 3. Merging a `FLUTTER_VERSION` bump to `main` triggers
-   `build-and-push.yml`'s `build-combo` and `build-platforms` jobs,
-   publishing the new `<version>`/`pinned`/`stable` tags for all 4
-   images together.
+   `build-and-push.yml`: a `version` job resolves the tags, `base` builds
+   and pushes `flutter-base`, then `images` builds `flutter`,
+   `flutter-android`, `flutter-web` and `flutter-linux` on top of it
+   (via the reusable `_build-image.yml`, with provenance + SBOM), and
+   `release` creates the GitHub release.
 
 This entire chain was verified with a real test run, not just designed on
 paper: a manually-lowered `FLUTTER_VERSION` was detected, a real PR was
@@ -159,7 +164,7 @@ Already configured on this repo — noted here in case it's ever recreated:
   not permitted to create or approve pull requests."*
 - **Settings → General → Pull Requests → "Allow auto-merge"** — without
   this, `gh pr merge --auto` has nothing to enable.
-- **Branch protection on `main`**: required status checks `Hadolint`, `Yamllint`, and `build-check` — strict (branch must be up to date before merging), requiring 1 approving review from maintainers and linear history. Merging is automated via the `automerge` label.
+- **Branch protection on `main`**: required status checks `Hadolint`, `Yamllint`, `build-check` and `build-check-platforms (android|web|linux)` — strict (branch must be up to date before merging), requiring 1 approving review from maintainers and linear history. Merging is automated via the `automerge` label.
 
 ## Usage
 
@@ -262,21 +267,38 @@ pipelines:
 
 ## Repo layout
 
-- `docker/Dockerfile` — the all-in-one `flutter` image (Android + Web + Linux
-  together). `FLUTTER_REF` build arg selects the git ref (a version tag
-  or a channel branch name) to install.
-- `docker/base.Dockerfile` — shared layer (Ubuntu, Firebase CLI, the Flutter
-  SDK itself) for the 3 split images below. Not published on its own.
-- `docker/android.Dockerfile` / `docker/web.Dockerfile` / `docker/linux.Dockerfile` — each
-  builds `FROM` a locally-built `docker/base.Dockerfile` (via the `BASE_IMAGE`
-  build-arg — see `build-and-push.yml`) plus only that platform's own
-  tooling, publishing `flutter-android`/`flutter-web`/`flutter-linux`.
-- `FLUTTER_VERSION` — single source of truth for every image's `pinned`
-  and `stable` tags' version; only ever changed by
-  `check-flutter-version.yml`'s bot PRs.
-- `.github/dependabot.yml` — keeps Actions versions and the base image
-  current.
-- `.github/workflows/` — the workflows described above, plus
-  `scorecard.yml`: runs [OpenSSF Scorecard](https://github.com/ossf/scorecard)
-  against this repo weekly and on every push to `main`, publishing the
-  result to the badge above and to GitHub's Code Scanning dashboard.
+```
+docker/
+  base.Dockerfile      Ubuntu (pinned digest) + Firebase CLI + Flutter SDK -> flutter-base
+  android.Dockerfile   FROM base + scripts/install-android.sh -> flutter-android
+  web.Dockerfile       FROM base + scripts/install-web.sh     -> flutter-web
+  linux.Dockerfile     FROM base + scripts/install-linux.sh   -> flutter-linux
+  combo.Dockerfile     FROM base + all three scripts          -> flutter
+  scripts/             one install script per toolchain (single source of truth)
+tests/                 container-structure-test configs: base, android, web, linux
+FLUTTER_VERSION        version for every image's tags; only changed by check-flutter-version.yml
+Makefile               local build/test, see below
+.github/
+  actions/build-and-test/   builds + tests one image (used by pr-check.yml)
+  workflows/                build-and-push.yml, _build-image.yml (reusable), pr-check.yml,
+                            check-flutter-version.yml, auto-merge.yml, image-health-check.yml,
+                            cleanup-ghcr-packages.yml, scorecard.yml, lint/yamllint/labeler/stale
+  dependabot.yml            keeps Actions versions and the base image current
+```
+
+`scorecard.yml` runs [OpenSSF Scorecard](https://github.com/ossf/scorecard)
+weekly and on every push to `main`, publishing the result to the badge above
+and to GitHub's Code Scanning dashboard.
+
+### Building and testing locally
+
+Requires Docker and [container-structure-test](https://github.com/GoogleContainerTools/container-structure-test).
+
+```bash
+make build-web          # builds flutter-base:build, then flutter-web:build
+make test-android       # build + run base and android tests
+make test-all           # every image
+make build-combo FLUTTER_REF=3.47.7
+```
+
+Images: `android`, `web`, `linux`, `combo`. `make help` lists everything.

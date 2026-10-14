@@ -1,11 +1,12 @@
 # Skill: Build Docker Images Locally
 
-If the user asks you to test the image build locally, use this skill:
+If the user asks you to test the image build locally, use the Makefile:
 
 ```bash
-# Build the base image first (required for platform images)
-docker build -t flutter-base:build -f docker/base.Dockerfile .
-
-# Build a specific platform
-docker build -t flutter-android:local -f docker/android.Dockerfile --build-arg BASE_IMAGE=flutter-base:build .
+make build-android      # builds flutter-base:build first, then flutter-android:build
+make test-web           # build + container-structure-test (base + web)
+make test-all           # every image
+make build-combo FLUTTER_REF=3.47.7
 ```
+
+Images: `android`, `web`, `linux`, `combo`. Install logic lives in `docker/scripts/install-*.sh`.

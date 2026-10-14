@@ -10,8 +10,8 @@ If you are Claude, Cursor, or another AI coding assistant, follow these rules wh
 
 ## Context
 When asked to modify the CI/CD pipeline, always check:
-- `build-and-push.yml` for publishing.
-- `pr-check.yml` for local branch testing.
+- `build-and-push.yml` (+ reusable `_build-image.yml`) for publishing.
+- `pr-check.yml` and `.github/actions/build-and-test` for local branch testing. Job names `build-check` and `build-check-platforms` are required status checks — do not rename.
 - `auto-merge.yml` for bot approval and contributor `automerge` label handling.
 - `.dockerignore` to ensure the context remains small.
 
