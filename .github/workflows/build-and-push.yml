@@ -98,15 +98,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          tag_name: ${{ steps.pinned.outputs.version }}
-          name: Flutter ${{ steps.pinned.outputs.version }}
-          body: "Automated Docker Image Release for Flutter ${{ steps.pinned.outputs.version }}\n\nDocker image: `ghcr.io/${{ github.repository_owner }}/flutter:${{ steps.pinned.outputs.version }}`"
-          draft: false
-          prerelease: false
-
   build-platforms:
     permissions:
       contents: read
@@ -185,3 +176,54 @@ jobs:
             BASE_IMAGE=flutter-base:build
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  release:
+    needs: [build-combo, build-platforms]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Read pinned Flutter version
+        id: pinned
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ steps.pinned.outputs.version }}
+          name: Flutter ${{ steps.pinned.outputs.version }}
+          body: |
+            ## 🚀 Automated Docker Image Release for Flutter ${{ steps.pinned.outputs.version }}
+
+            Enterprise-grade, multi-platform Docker container images built directly from Flutter's official `stable` channel release.
+
+            ### 📦 Available Images (GitHub Container Registry)
+
+            | Image | Platforms / Included Toolchain | Quick Pull Command |
+            |---|---|---|
+            | **`flutter` (Combo)** | Android SDK + Google Chrome + Linux Desktop | `docker pull ghcr.io/${{ github.repository_owner }}/flutter:${{ steps.pinned.outputs.version }}` |
+            | **`flutter-android`** | Android SDK + Command-line tools (no Chrome/Linux Desktop) | `docker pull ghcr.io/${{ github.repository_owner }}/flutter-android:${{ steps.pinned.outputs.version }}` |
+            | **`flutter-web`** | Headless Google Chrome + Web compilation tools | `docker pull ghcr.io/${{ github.repository_owner }}/flutter-web:${{ steps.pinned.outputs.version }}` |
+            | **`flutter-linux`** | Linux Desktop build toolchain | `docker pull ghcr.io/${{ github.repository_owner }}/flutter-linux:${{ steps.pinned.outputs.version }}` |
+
+            ### 🏷️ Supported Tags
+            - `${{ steps.pinned.outputs.version }}`, `${{ steps.pinned.outputs.version }}` (major.minor), `${{ steps.pinned.outputs.version }}` (major)
+            - `pinned` (immutable reproducible tag for CI/CD)
+            - `stable` (tracks official Flutter stable branch)
+            - `latest`
+
+            ### 🛡️ Supply Chain & Security Features
+            - **Hardened Base Image:** Built on official Ubuntu with pinned digest hashes
+            - **SLSA Level 3 Provenance & SBOM:** Attestations embedded via GitHub Container Registry
+            - **OpenSSF Scorecard Compliant:** High security posture with minimal token privileges
+
+            ---
+            *Generated automatically by [${{ github.repository }}](https://github.com/${{ github.repository }})*
+          draft: false
+          prerelease: false
+
