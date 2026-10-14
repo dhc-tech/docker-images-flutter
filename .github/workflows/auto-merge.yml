@@ -221,8 +221,8 @@ jobs:
             remove_label "ci-failed"
             add_label "automerge"
             verify_label_applied "automerge"
-            gh pr merge --auto --squash "$PR_URL"
-            echo "Done — bot PR queued for auto-squash-merge by github-actions[bot]."
+            GH_TOKEN="${BOT_PAT:-$GH_TOKEN}" gh pr merge --auto --squash --delete-branch "$PR_URL"
+            echo "Done — bot PR queued for auto-squash-merge."
             exit 0
           fi
 
@@ -262,5 +262,5 @@ jobs:
           remove_label "ci-failed"
           add_label "automerge"
           verify_label_applied "automerge"
-          gh pr merge --auto --squash "$PR_URL"
-          echo "Auto-merge enabled by github-actions[bot]."
+          GH_TOKEN="${BOT_PAT:-$GH_TOKEN}" gh pr merge --auto --squash --delete-branch "$PR_URL"
+          echo "Auto-merge enabled."
