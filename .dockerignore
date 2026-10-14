@@ -2,6 +2,7 @@
 .github
 .dockerignore
 *.md
+docs
 LICENSE
 FLUTTER_VERSION
 Makefile

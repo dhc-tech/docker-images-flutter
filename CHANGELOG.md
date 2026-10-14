@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests split per image (`tests/{base,android,web,linux}.yaml`); `container-structure-test` pinned to v1.22.1.
 - Makefile uses pattern rules (`make test-android`, `make build-all`, ...).
 
+### Docs
+- Documentation moved into `docs/` (images, usage, releases, automation, development, supply chain); README shortened. `AGENT.md`, `.agent/` and `.cursorrules` content merged into a single `AGENTS.md`; `CLAUDE.md` imports it.
+
 ### Fixed
 - `ANDROID_NDK_HOME` now points at the `ndk-bundle` symlink instead of a hardcoded NDK version.
 - GitHub release notes listed the same tag three times instead of `<version>`, `<major.minor>`, `<major>`.
