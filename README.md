@@ -60,7 +60,7 @@ Every image above uses the same two tags:
 | Tag | What it is | Pick this if you want... | Rebuilds |
 |---|---|---|---|
 | `stable` | Flutter's official **stable** channel — always the same build as the current `<version>`/`pinned` tag below | The version most people should build against day to day | Automatically, the moment flutter/flutter's `stable` branch is tagged with a new version — see below |
-| `<version>` (e.g. `3.47.2`) / `pinned` | The exact version number of the current stable release, immutable — never silently changes under you | Reproducible builds: the same tag always means the same Flutter build, unlike `stable` which moves forward over time | Automatically, the moment flutter/flutter's `stable` branch is tagged with a new version — see below |
+| `<version>` (e.g. `3.47.7`) / `pinned` | The exact version number of the current stable release, immutable — never silently changes under you | Reproducible builds: the same tag always means the same Flutter build, unlike `stable` which moves forward over time | Automatically, the moment flutter/flutter's `stable` branch is tagged with a new version — see below |
 
 In short: `stable` tracks whatever Flutter currently calls its stable
 release (moves over time, ~quarterly); `<version>`/`pinned` freezes that
@@ -101,7 +101,7 @@ pointless rebuilds that don't correspond to an actual new release.
 
 This repository employs strict, industry-standard DevOps practices to ensure secure, reproducible, and optimized builds:
 
-- **Semantic Versioning & Docker Metadata:** Docker images are tagged properly using `docker/metadata-action`, supporting major, minor, and patch SemVer tags (e.g., `3`, `3.24`, `3.24.2`, `latest`, `stable`). Standard OCI metadata labels (`org.opencontainers.image.source`, `org.opencontainers.image.licenses`, etc.) are natively embedded.
+- **Semantic Versioning & Docker Metadata:** Docker images are tagged properly using `docker/metadata-action`, supporting major, minor, and patch SemVer tags (e.g., `3`, `3.47`, `3.47.7`, `latest`, `stable`). Standard OCI metadata labels (`org.opencontainers.image.source`, `org.opencontainers.image.licenses`, etc.) are natively embedded.
 - **Supply Chain Security:** All GitHub Action dependencies are pinned to absolute 40-character SHA hashes. Base Docker images (like `ubuntu:26.04`) are pinned to SHA256 digests to protect against supply-chain poisoning.
 - **Continuous Integration Quality Gates:** 
   - **Hadolint** runs on all Pull Requests to statically analyze and enforce Dockerfile best practices.
@@ -175,7 +175,7 @@ actually changing) — you never touch this line again.
 
 **Reproducible builds — freeze one exact Flutter version forever:**
 ```yaml
-image: ghcr.io/dhc-tech/flutter-android:3.24.2   # or 3.24, or 3   # or flutter-web / flutter-linux / flutter
+image: ghcr.io/dhc-tech/flutter-android:3.47.7   # or 3.47, or 3   # or flutter-web / flutter-linux / flutter
 ```
 Never changes. Use this if you need every build to use the *exact* same
 Flutter SDK build over build, and are fine manually bumping the tag
