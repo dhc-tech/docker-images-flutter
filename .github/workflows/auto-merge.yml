@@ -39,8 +39,9 @@ jobs:
         run: |
           if [ -n "$PR_FROM_EVENT" ]; then
             echo "pr_numbers=[${PR_FROM_EVENT}]" >> "$GITHUB_OUTPUT"
-          elif [ "$SUITE_PRS" != "null" ] && [ "$SUITE_PRS" != "[]" ]; then
-            echo "pr_numbers=${SUITE_PRS}" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SUITE_PRS" ] && [ "$SUITE_PRS" != "null" ]; then
+            compact_prs="$(echo "$SUITE_PRS" | jq -c . 2>/dev/null || echo "[]")"
+            echo "pr_numbers=${compact_prs}" >> "$GITHUB_OUTPUT"
           else
             echo "pr_numbers=[]" >> "$GITHUB_OUTPUT"
           fi
