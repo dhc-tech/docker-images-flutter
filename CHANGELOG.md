@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - High-performance caching GitHub Actions workflow example with Gradle & Pub cache in `README.md`.
 - Productive developer Makefile targets (`make build-all`, `make test-all`, `make clean`).
 - Real-time Docker Images build & release badge in `README.md`.
+- Automated GHCR package cleanup workflow (`.github/workflows/cleanup-ghcr-packages.yml`) to purge untagged digests and intermediate layers while preserving the 3.47+ series tags.
 
 ### Fixed
 - Fixed BuildKit attestation error on `build-platforms` docker driver.
