@@ -108,7 +108,7 @@ jobs:
       pull-requests: write
     steps:
       - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT_WORKFLOW || secrets.GITHUB_TOKEN }}
           TRUSTED_PRS: ${{ needs.trusted-prs.outputs.prs }}
         run: |
           set -e
@@ -121,7 +121,7 @@ jobs:
 
             if [ "$has_auto_merge" != "true" ]; then
               echo "PR #$number ($author) has no auto-merge enabled yet — enabling."
-              if ! gh pr merge --auto --squash "$url"; then
+              if ! gh pr merge --auto --squash --delete-branch "$url"; then
                 echo "::error::Failed to enable auto-merge for PR #$number."
                 echo "$number" >> /tmp/failed_prs
               fi
