@@ -6,9 +6,9 @@ metadataTest:
 commandTests:
   - name: "Chrome installed"
     command: "dpkg-query"
-    args: ["-W", "-f=${Package} ${Version}", "google-chrome-stable"]
+    args: ["-W", "google-chrome-stable"]
     expectedOutput: ["google-chrome-stable [0-9]+"]
-  # Headless Chrome prints nothing for --version, so only the exit code is checked.
+  # Exit code only: the printed version is not reliably emitted on a cold start.
   - name: "Chrome launches"
     command: "google-chrome-stable"
     args: ["--headless", "--disable-gpu", "--no-sandbox", "--version"]
