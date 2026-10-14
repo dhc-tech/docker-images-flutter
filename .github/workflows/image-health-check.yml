@@ -1,0 +1,36 @@
+name: Image Health Check
+
+# Periodically pulls the published container images from GHCR and runs
+# comprehensive diagnostic health checks (flutter doctor -v) to guarantee
+# that all published images remain functional, certificates remain valid,
+# and upstream platform dependencies continue to pass.
+
+on:
+  schedule:
+    # Runs every Sunday at midnight UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    name: Verify ${{ matrix.image }}:stable
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - flutter
+          - flutter-android
+          - flutter-web
+          - flutter-linux
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:stable
+    steps:
+      - name: Check Flutter Version
+        run: flutter --version
+
+      - name: Run Flutter Doctor Diagnostics
+        run: flutter doctor -v

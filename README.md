@@ -1,6 +1,7 @@
 # docker-images-flutter
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dhc-tech/docker-images-flutter/badge)](https://scorecard.dev/viewer/?uri=github.com/dhc-tech/docker-images-flutter)
+[![Docker Images](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/build-and-push.yml)
 [![CI Build](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/pr-check.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/pr-check.yml)
 [![Lint](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/lint.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/lint.yml)
 [![Yamllint](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/yamllint.yml/badge.svg)](https://github.com/dhc-tech/docker-images-flutter/actions/workflows/yamllint.yml)
@@ -206,7 +207,7 @@ Copy-pasteable snippets for running an image as the build container in a
 few common CI systems — swap in whichever image/tag you picked in
 [Usage](#usage) above.
 
-**GitHub Actions:**
+**GitHub Actions (Standard):**
 ```yaml
 jobs:
   build:
@@ -214,8 +215,31 @@ jobs:
     container:
       image: ghcr.io/dhc-tech/flutter-android:stable
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - run: flutter build apk
+```
+
+**GitHub Actions (High Performance with Caching):**
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/dhc-tech/flutter-android:stable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Gradle & Pub Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.pub-cache
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+      - run: flutter pub get
+      - run: flutter build apk --release
 ```
 
 **GitLab CI:**

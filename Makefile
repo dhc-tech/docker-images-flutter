@@ -1,4 +1,4 @@
-.PHONY: help install-hooks lint test-combo test-base build-combo build-base build-android build-web build-linux
+.PHONY: help install-hooks lint test-combo test-base test-all build-combo build-base build-android build-web build-linux build-all clean
 
 # Default target
 help:
@@ -10,8 +10,11 @@ help:
 	@echo "  make build-android    - Build the 'flutter-android' image"
 	@echo "  make build-web        - Build the 'flutter-web' image"
 	@echo "  make build-linux      - Build the 'flutter-linux' image"
+	@echo "  make build-all        - Build all images in sequence"
 	@echo "  make test-combo       - Run container-structure-test on the combo image"
 	@echo "  make test-base        - Run container-structure-test on the base image"
+	@echo "  make test-all         - Run all container-structure-tests"
+	@echo "  make clean            - Remove local build and dangling container images"
 
 install-hooks:
 	pre-commit install
@@ -39,3 +42,11 @@ test-combo: build-combo
 
 test-base: build-base
 	container-structure-test test --image flutter-base:build --config tests/flutter-base.yaml
+
+build-all: build-combo build-android build-web build-linux
+
+test-all: test-combo test-base
+
+clean:
+	docker rmi -f flutter:build flutter-base:build flutter-android:local flutter-web:local flutter-linux:local 2>/dev/null || true
+	docker image prune -f
