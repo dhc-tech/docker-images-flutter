@@ -54,10 +54,17 @@ jobs:
       - name: Read pinned Flutter version
         id: pinned
         run: |
+          current="$(cat FLUTTER_VERSION)"
           if [ -n "${{ inputs.version }}" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            if [ "${{ inputs.version }}" = "$current" ]; then
+              echo "is_latest=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_latest=false" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+            echo "version=$current" >> "$GITHUB_OUTPUT"
+            echo "is_latest=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -74,9 +81,9 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.pinned.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.pinned.outputs.version }}
             type=semver,pattern={{major}},value=${{ steps.pinned.outputs.version }}
-            type=raw,value=latest
-            type=raw,value=pinned
-            type=raw,value=stable
+            type=raw,value=latest,enable=${{ steps.pinned.outputs.is_latest }}
+            type=raw,value=pinned,enable=${{ steps.pinned.outputs.is_latest }}
+            type=raw,value=stable,enable=${{ steps.pinned.outputs.is_latest }}
           labels: |
             org.opencontainers.image.description=Flutter Docker image for CI/CD (Combo)
             org.opencontainers.image.licenses=MIT
@@ -112,10 +119,17 @@ jobs:
       - name: Read pinned Flutter version
         id: pinned
         run: |
+          current="$(cat FLUTTER_VERSION)"
           if [ -n "${{ inputs.version }}" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            if [ "${{ inputs.version }}" = "$current" ]; then
+              echo "is_latest=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_latest=false" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "version=$(cat FLUTTER_VERSION)" >> "$GITHUB_OUTPUT"
+            echo "version=$current" >> "$GITHUB_OUTPUT"
+            echo "is_latest=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -161,9 +175,9 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.pinned.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.pinned.outputs.version }}
             type=semver,pattern={{major}},value=${{ steps.pinned.outputs.version }}
-            type=raw,value=latest
-            type=raw,value=pinned
-            type=raw,value=stable
+            type=raw,value=latest,enable=${{ steps.pinned.outputs.is_latest }}
+            type=raw,value=pinned,enable=${{ steps.pinned.outputs.is_latest }}
+            type=raw,value=stable,enable=${{ steps.pinned.outputs.is_latest }}
           labels: |
             org.opencontainers.image.description=Flutter Docker image for CI/CD (${{ matrix.platform }})
             org.opencontainers.image.licenses=MIT
