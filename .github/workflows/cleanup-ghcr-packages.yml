@@ -1,43 +1,40 @@
+---
 name: Cleanup GHCR Container Versions
 
-# Periodically and manually purges untagged container image digests and stale
-# intermediate layers from GitHub Container Registry (GHCR), preserving all
-# official tagged releases from the 3.47 series upwards (3.47.*, stable, latest, pinned).
-
+# Weekly purge of untagged image versions in GHCR. Every release moves the
+# <version>/stable/latest tags onto new digests, leaving the old ones untagged.
+#
+# Tagged versions are never touched. The retention action protects the child
+# manifests of multi-arch images and of images with provenance/SBOM
+# attestations, which GHCR also lists as untagged; a plain "delete untagged"
+# would delete them and break pulls of the tagged image.
+#
+# Manual runs default to dry-run: the log lists what would be deleted.
 on:
   schedule:
-    # Runs every Sunday at 02:00 UTC
     - cron: "0 2 * * 0"
   workflow_dispatch:
     inputs:
-      delete_untagged_only:
-        description: "Delete only untagged versions (keeps all tagged releases)"
+      dry_run:
+        description: "Only log what would be deleted"
         type: boolean
         default: true
-        required: true
 
 permissions:
-  packages: write
   contents: read
 
 jobs:
-  cleanup-packages:
-    name: Clean ${{ matrix.package }}
+  cleanup:
+    name: Clean untagged versions
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-          - flutter
-          - flutter-android
-          - flutter-web
-          - flutter-linux
+    permissions:
+      packages: write
     steps:
-      - name: Purge untagged container digests for ${{ matrix.package }}
-        uses: actions/delete-package-versions@v5
+      - uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
-          package-name: ${{ matrix.package }}
-          package-type: 'container'
-          delete-only-untagged-versions: ${{ github.event.inputs.delete_untagged_only || 'true' }}
-          ignore-versions: '^(3\.47\..*|stable|latest|pinned)$'
-          token: ${{ secrets.GH_PAT_WORKFLOW }}
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: "flutter flutter-base flutter-android flutter-web flutter-linux"
+          tag-selection: untagged
+          cut-off: 7d
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}

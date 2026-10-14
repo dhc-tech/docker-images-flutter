@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation moved into `docs/` (images, usage, releases, automation, development, supply chain); README shortened. `AGENT.md`, `.agent/` and `.cursorrules` content merged into a single `AGENTS.md`; `CLAUDE.md` imports it.
 
 ### Fixed
+- GHCR cleanup now uses `snok/container-retention-policy`, which keeps multi-arch and attestation child manifests, covers `flutter-base`, waits 7 days, and supports dry-run. The previous untagged purge could delete manifests that tagged images depend on.
 - `ANDROID_NDK_HOME` now points at the `ndk-bundle` symlink instead of a hardcoded NDK version.
 - GitHub release notes listed the same tag three times instead of `<version>`, `<major.minor>`, `<major>`.
 
