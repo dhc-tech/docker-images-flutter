@@ -24,3 +24,6 @@ commandTests:
     command: "google-chrome-stable"
     args: ["--version"]
     expectedOutput: ["Google Chrome"]
+  - name: "Check Android NDK Installation"
+    command: "test"
+    args: ["-d", "/opt/android-sdk/ndk"]
