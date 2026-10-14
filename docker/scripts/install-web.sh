@@ -17,4 +17,3 @@ rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 google-chrome-stable --headless --disable-gpu --no-sandbox --version
 
 flutter precache --web
-flutter doctor -v

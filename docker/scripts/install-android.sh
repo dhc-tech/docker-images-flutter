@@ -52,6 +52,5 @@ echo "${compile_sdk}" > /opt/flutter-compilesdk-version.txt
 echo "${ndk_version}" > /opt/flutter-ndk-version.txt
 
 flutter precache --android
-flutter doctor -v
 
 rm -rf "${ANDROID_HOME}/.temp" /root/.android/cache

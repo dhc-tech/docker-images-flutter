@@ -6,5 +6,5 @@ metadataTest:
 commandTests:
   - name: "Chrome"
     command: "google-chrome-stable"
-    args: ["--version"]
+    args: ["--headless", "--disable-gpu", "--no-sandbox", "--version"]
     expectedOutput: ["Google Chrome"]

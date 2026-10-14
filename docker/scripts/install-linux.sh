@@ -10,4 +10,3 @@ rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 flutter config --enable-linux-desktop
 flutter precache --linux
-flutter doctor -v
